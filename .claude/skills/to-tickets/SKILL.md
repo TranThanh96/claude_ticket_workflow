@@ -179,6 +179,13 @@ Increment the ticket's `plan_rounds` for every round that counts. At `plan_round
 "factual inconsistency" or "approach" disagreement escalates to the real user instead of another
 round — summarize both positions rather than looping further.
 
+**An escalation can hand back a new fact, not just a decision.** If the real user's answer settles
+something concrete that constrains testable behavior (a threshold, a format, a specific rule) and
+the tests written in 6.2 don't already verify it, update or add to those tests now — via `tdd`,
+still at the seam level, still red against the current stub — before the plan can be marked
+approved. The delegate's only feedback loop is the tests it was given and can never edit; a fact
+that never enters them is a fact the delegate has no way to be checked against.
+
 Once the plan is acceptable, set `status: plan-approved` and continue to 6.4.
 
 #### 6.4 Dispatch the implementation
@@ -189,21 +196,84 @@ Once the plan is acceptable, set `status: plan-approved` and continue to 6.4.
   and, for `medium`/`large` tickets, the approved plan — not the conversation the plan round
   produced; a fresh subagent only needs the ticket, the contract, and the approved plan itself.
   Point it at `.claude/skills/implementation/SKILL.md`.
-- **Codex** / **Antigravity** → set `assigned_to` and `status: in-progress`, then print the exact
-  command for the user to run themselves:
-  - Codex: `codex exec "Implement the ticket at .claude/tasks/<feature-slug>/NN-slug.md using the skeleton/tests at <paths>[, following the approved plan: <plan summary>]. Read AGENTS.md first, follow .claude/skills/implementation/SKILL.md, and report back using the Implementation Report format."`
-  - Antigravity: `antigravity run "..."` — same content as the Codex command above.
+- **Codex** / **Antigravity** → set `assigned_to` and `status: in-progress`, then dispatch it
+  yourself as a background subprocess using the JSON protocol below. Don't ask the user to run
+  anything by hand.
 
-  Every dispatch — the plan request, a correction round, and the final execute — is its own fresh,
-  stateless process. Never tell the user to resume or continue a prior Codex/Antigravity session:
-  Codex's headless `exec` mode is documented to skip auto-compaction (a long resumed session risks
-  crashing outright), and Antigravity's auto-compaction is lossy (it can silently drop a constraint
-  the delegate needs). Curate what each fresh process needs yourself — the ticket, the skeleton and
-  tests, and, on a correction round, the delegate's last plan plus your specific feedback — rather
-  than relying on either CLI's own memory of the conversation.
+Every dispatch — the plan request, a correction round, and the final execute — is its own fresh,
+stateless process. Never resume or continue a prior Codex/Antigravity session: Codex's headless
+`exec` mode is documented to skip auto-compaction (a long resumed session risks crashing outright),
+and Antigravity's auto-compaction is lossy (it can silently drop a constraint the delegate needs).
+Curate what each fresh process needs yourself — the ticket, the skeleton and tests, and, on a
+correction round, the delegate's last plan plus your specific feedback — rather than relying on
+either CLI's own memory of the conversation.
 
-  Mention the routing suggestion for that complexity tier as a hint, not an instruction
-  (`.claude/routing.json` may still be blank for these two agents — say so if it is).
+<json-dispatch-protocol>
+
+Each round of a Codex/Antigravity dispatch (a plan request, a plan-correction round, or the final
+implementation) exchanges exactly one request/response pair of JSON files, next to the ticket:
+
+```
+.claude/tasks/<feature-slug>/NN-slug.md          # the ticket itself, unchanged
+.claude/tasks/<feature-slug>/NN-slug/            # this ticket's JSON exchange, one folder
+  plan-round-1.task.json
+  plan-round-1.report.json
+  plan-round-2.task.json                         # only if a correction round happened
+  plan-round-2.report.json
+  implementation.task.json
+  implementation.report.json
+```
+
+**Write the task JSON** before every dispatch:
+
+```json
+{
+  "round": "plan | plan-correction | implementation",
+  "ticket_path": ".claude/tasks/<feature-slug>/NN-slug.md",
+  "skeleton_paths": ["..."],
+  "test_paths": ["..."],
+  "prior_plan": null,
+  "feedback": null,
+  "approved_plan": null,
+  "instructions": "<the literal brief for this round: the 4-part plan request from 6.3, or the implementation brief, including 'never edit test_paths, report BLOCKED instead' and, when approved_plan is set, 'stay within its declared files/seams, report BLOCKED before leaving them'>",
+  "report_path": ".claude/tasks/<feature-slug>/NN-slug/<round-name>.report.json"
+}
+```
+
+`prior_plan` and `feedback` are set only on a `plan-correction` round. `approved_plan` is set only
+on the `implementation` round, and must be the plan text itself, spelled out — the fresh process
+never saw the earlier round that produced it and has no memory to fall back on.
+
+**Dispatch it**: run the CLI via `Bash` with `run_in_background: true`, instructing it only to read
+the task JSON, follow its `instructions` field, write its reply to `report_path` matching the
+schema below, then exit.
+
+- Codex: `codex exec "Read the task JSON at <task-path> and follow its instructions field exactly. Follow .claude/skills/implementation/SKILL.md."`
+- Antigravity: the same prompt via `antigravity run --dangerously-skip-permissions "..."` — the flag
+  is required for non-interactive read/write access; without it, every file operation stalls on a
+  permission prompt no one is there to answer.
+
+**On completion** (the background job's own finish notification — no polling, no file watcher
+needed, since these are one-shot processes that exit when done): read `report_path`.
+
+- Missing, or fails to parse against the schema → treat it as a crash, never assume success. Set
+  `status: blocked` and surface it to the user with whatever stderr/log is available.
+- Parses cleanly → continue as normal: the 4-bucket review for a plan reply (6.3), or DONE/BLOCKED/
+  PARTIAL handling for an implementation reply (see `implementation`'s report format).
+
+Report JSON schemas:
+
+- Plan round: `{"type": "plan", "approach": str, "files_seams": [str], "risks": str, "test_strategy": str}`
+- Implementation round: `{"type": "report", "status": "DONE"|"BLOCKED"|"PARTIAL", "summary": str, "files_changed": [str], "blocked_reason": str|null}`
+
+The `NN-slug/` folder travels with the ticket when a completed feature is archived to
+`.claude/tasks/_archive/` — it's part of the ticket's record, not scratch space to clean up on its
+own.
+
+</json-dispatch-protocol>
+
+Mention the routing suggestion for that complexity tier as a hint, not an instruction
+(`.claude/routing.json` may still be blank for these two agents — say so if it is).
 
 Once a ticket completes (report received, or subagent returns), the ticket(s) it was blocking may
 join the frontier — repeat this step for them.

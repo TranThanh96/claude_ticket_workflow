@@ -34,6 +34,17 @@ Check the ticket's `status` before doing anything else:
 - **`plan-approved`**, or a `trivial`/`small` ticket with no plan step — implement, following the
   Process below.
 
+## Where your reply goes
+
+If you were dispatched with a **task JSON** (it has a `report_path` field — this is how `to-tickets`
+step 6.4 dispatches Codex/Antigravity), write your reply there as JSON, matching the schema its
+`instructions` field describes, then exit. Don't also reply in chat — no one is reading it. A
+BLOCKED outcome still goes to `report_path`: fold this doc's "If you get blocked" template into the
+`blocked_reason` string as one prose block, with `status: "BLOCKED"`.
+
+If there's no task JSON (you're a Claude subagent returning a result, or a human running this
+yourself and reporting in chat), use the markdown templates below instead.
+
 ## Process
 
 1. Read the ticket file in full, then every entry its **Context to read** section cites.

@@ -2,6 +2,12 @@
 
 **Spec-first planning for large features, and tickets you can delegate across Claude, Codex, and Antigravity.**
 
+> This is one person's own workflow: Claude Code as the **main agent** — it plans, writes the spec,
+> breaks work into tickets, and reviews what comes back. Other coding CLIs (Codex, Antigravity, or
+> Claude itself) act as **sub-agents** — they just implement one ticket at a time and report back.
+> It fits how I work; it may not fit how you work. If you use this, **read it and adapt it to your
+> own setup** — don't install it and follow it blindly.
+
 The [claude_memory_bank](https://github.com/TranThanh96/claude_memory_bank) answers "what
 happened before." It has nothing to say about "how do I break a big feature into pieces, or
 hand pieces to different coding agents." That's what this repo solves:
@@ -100,16 +106,19 @@ Delegation picks a coding agent per ticket:
 
 - **Claude** — a subagent is spawned in-session immediately, model chosen from `.claude/routing.json`
   by the ticket's complexity.
-- **Codex** / **Google Antigravity** — you're given a ready-to-run command
-  (`codex exec "..."` / `antigravity run "..."`). Both read `AGENTS.md` at the repo root on their own,
-  so they pick up this project's rules without being told twice.
+- **Codex** / **Google Antigravity** — the Main Agent runs them itself, as a background subprocess
+  (`codex exec "..."` / `antigravity run --dangerously-skip-permissions "..."`), no manual copy-paste
+  needed. Both read `AGENTS.md` at the repo root on their own, so they pick up this project's rules
+  without being told twice.
 
 For `medium`/`large` tickets, the delegate replies with a short plan (approach, files/seams, risks,
 test strategy) before writing any code; the Main Agent approves it, corrects it, or — only when the
 plan depends on something never actually decided — brings it to you. Every dispatch (plan, a
 correction round, or the final implementation) is a fresh, stateless run: nobody resumes a prior
 Codex/Antigravity session, since neither CLI's own context compaction is reliable enough to trust
-with what the delegate needs to remember.
+with what the delegate needs to remember. Each round exchanges one task/report JSON pair next to the
+ticket (`.claude/tasks/<feature>/NN-slug/`); the Main Agent dispatches in the background and reads
+the report once the process exits — see `to-tickets`'s step 6.4 for the exact protocol.
 
 `scripts/tasks_status.py` shows ticket status without opening every file. "update memory" (from
 the memory-bank layer) archives a feature's tickets to `.claude/tasks/_archive/` once every ticket
