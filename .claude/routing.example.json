@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy to .claude/routing.json and edit. `claude` uses the Agent tool's model aliases (haiku/sonnet/opus) -- these always resolve to Anthropic's current generation, so this block never goes stale. `codex`/`antigravity` need YOUR actual model names filled in once you've used them; leave blank until then rather than guessing.",
+  "_comment": "Copy to .claude/routing.json and edit. `claude` uses the Agent tool's model aliases (haiku/sonnet/opus) -- these always resolve to Anthropic's current generation, so this block never goes stale. `codex`/`antigravity` need YOUR actual model names filled in once you've used them; leave blank until then rather than guessing. The `trivial` tier is never looked up any more (to-tickets implements those directly instead of dispatching) -- left here so an old routing.json doesn't need editing, not because anything reads it.",
   "claude": {
     "trivial": "haiku",
     "small": "haiku",

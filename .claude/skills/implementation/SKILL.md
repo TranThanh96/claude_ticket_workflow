@@ -23,23 +23,46 @@ If you are not Claude Code (Codex, Antigravity, or anything else), also explicit
 `.claude/rules/core-rules.md` and `.claude/rules/coding-guidelines.md` now — only Claude Code
 auto-loads these.
 
+## Two modes
+
+Check the ticket's `status` before doing anything else:
+
+- **`plan-pending`** — you were dispatched for a **plan request**, not implementation. Read the
+  ticket and the skeleton/tests you were pointed at, then reply with a plan only: (a) your approach,
+  in prose, (b) the files/seams you expect to touch, (c) risks or points you're unsure of, (d) how
+  you'll verify the change. No code in the reply. Stop there — do not touch the codebase.
+- **`plan-approved`**, or a `trivial`/`small` ticket with no plan step — implement, following the
+  Process below.
+
 ## Process
 
 1. Read the ticket file in full, then every entry its **Context to read** section cites.
-2. Inspect the current code at the seams the ticket touches.
-3. Use `tdd` at the seams the ticket already names. If the ticket doesn't name them and the interface shape itself is in question, that's not yours to resolve — emit a BLOCKED report (see below) instead of picking a seam yourself.
-4. Implement the smallest correct change. Avoid unrelated refactoring.
-5. Run typechecking regularly, single test files regularly, and the full test suite once at the end.
-6. Self-review, then use `ticket-review` (not the built-in `/code-review` — that one hunts bugs;
+2. Inspect the current code at the seams the ticket touches. If the ticket was dispatched with a
+   skeleton and pre-written tests, they define the seams — don't invent or renegotiate one.
+3. Use `tdd` at the seams the ticket already names, filling in the given skeleton bodies. If the
+   ticket doesn't name them and the interface shape itself is in question, that's not yours to
+   resolve — emit a BLOCKED report (see below) instead of picking a seam yourself.
+4. **Never edit a test file you were given.** If you believe one of them is wrong, stop and emit a
+   BLOCKED report explaining why — don't work around it and don't change it yourself.
+5. **Stay inside the approved plan's declared files/seams and approach.** If you discover mid-task
+   that you need to touch something outside that scope, or need a materially different approach,
+   stop and emit a BLOCKED report *before* making that change — don't do it first and mention it in
+   the final report. Restructuring inside an already-approved seam (helper functions, naming, loop
+   style — anything the plan never specified) doesn't need this; only leaving the declared scope
+   does.
+6. Implement the smallest correct change. Avoid unrelated refactoring.
+7. Run typechecking regularly, single test files regularly, and the full test suite once at the end.
+8. Self-review, then use `ticket-review` (not the built-in `/code-review` — that one hunts bugs;
    `ticket-review` checks this diff against the ticket and this repo's conventions).
-7. Flip the ticket's frontmatter to `status: done` (or `blocked`, see below).
-8. Commit your work to the current branch.
-9. Report back using the template below.
+9. Flip the ticket's frontmatter to `status: done` (or `blocked`, see below).
+10. Commit your work to the current branch.
+11. Report back using the template below.
 
 ## If you get blocked
 
-Ambiguity in requirements or architecture — not a capability limit — is a decision for the Main
-Agent, never yours to make silently. Set the ticket's `status: blocked` and report:
+Ambiguity in requirements or architecture, a test you believe is wrong, or a need to leave the
+approved plan's scope — not a capability limit — is a decision for the Main Agent, never yours to
+make silently. Set the ticket's `status: blocked` and report:
 
 ```
 # BLOCKED

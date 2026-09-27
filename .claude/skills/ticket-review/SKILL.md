@@ -66,13 +66,15 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
 
 - The full diff command and commit list.
 - The contents of `.claude/rules/coding-guidelines.md` and the relevant part of `.claude/memory/patterns.md`, **plus the smell baseline from step 3** pasted in full (the sub-agent has no other access to it).
-- The brief: "Report, per file/hunk where relevant, (a) every place the diff violates a documented standard: cite the standard (file + the rule); and (b) any baseline smell you spot: name it and quote the hunk. Distinguish hard violations from judgement calls: documented-standard breaches can be hard, but baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything tooling enforces. Under 400 words."
+- The path(s) of any test file(s) the ticket was dispatched with (its skeleton/tests, if it went through `to-tickets` step 6.2), so the sub-agent can check whether they were modified.
+- The brief: "Report, per file/hunk where relevant, (a) every place the diff violates a documented standard: cite the standard (file + the rule); (b) any baseline smell you spot: name it and quote the hunk; and (c) whether any of the listed test files were modified in the diff at all — if so, that's a finding regardless of whether the tests still pass. Distinguish hard violations from judgement calls: documented-standard breaches and a modified test file are hard violations, baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything tooling enforces. Under 400 words."
 
 **Spec sub-agent prompt** should include:
 
 - The diff command and commit list.
 - The path or contents of the ticket(s) and/or `SPEC.md`.
-- The brief: "Report: (a) requirements the spec/ticket asked for that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where the implementation looks wrong. Quote the ticket/spec line for each finding. Under 400 words."
+- If the ticket went through the plan-approval gate (`to-tickets` step 6.3), the approved plan's declared files/seams and approach, plus any `BLOCKED` reports in the ticket's history.
+- The brief: "Report: (a) requirements the spec/ticket asked for that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where the implementation looks wrong; (d) if an approved plan was supplied, whether the files/seams actually touched in the diff match its declared list — a mismatch with no corresponding BLOCKED report in the ticket's history is its own finding, separate from (b). Quote the ticket/spec/plan line for each finding. Under 400 words."
 
 If the spec is missing, skip the Spec sub-agent and note this in the final report.
 

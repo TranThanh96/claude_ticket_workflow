@@ -27,6 +27,12 @@ Ask: "What's the public interface, and which seams should we test?" When the sha
 
 "The user" here means whoever can actually answer: the person you're chatting with in an interactive session, or nobody when you're an `implementation` subagent running a ticket headless. In the second case, don't guess and don't invent an answer — an unconfirmed seam is exactly the ambiguity `implementation`'s BLOCKED path exists for.
 
+**Exception: a ticket dispatched with its own skeleton and tests already written.** When
+`to-tickets` writes the seam-level skeleton and tests before dispatch (see its step 6.2), that seam
+is already agreed — the Main Agent confirmed it, not you. Skip the confirmation step and go straight
+to red→green against the given test. You still never edit that test: if you believe it's wrong,
+that's a BLOCKED report (see `implementation`'s "If you get blocked"), not something to fix yourself.
+
 ## Anti-patterns
 
 - **Implementation-coupled**: mocks internal collaborators, tests private methods, or verifies through a side channel (querying the database instead of using the interface). The tell: the test breaks when you refactor but behavior hasn't changed.

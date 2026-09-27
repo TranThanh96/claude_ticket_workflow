@@ -21,12 +21,17 @@ are all done ever get worked on — that set is the **frontier**:
 to-tickets writes:   01 (no blockers)   02 (blocked by 01)   03 (blocked by 01)
                             │
                             ▼
-              delegate 01 to: Claude subagent | Codex | Antigravity | yourself
+       01: trivial? implement it directly, no dispatch at all
+       01: otherwise, write its skeleton + tests, then delegate to:
+                 Claude subagent | Codex | Antigravity | yourself
+                            │
+        medium/large: plan → Main Agent reviews (approve / correct / escalate) → implement
+        trivial/small: implement straight away
                             │
                        01 → done
                             │
                             ▼
-             02 and 03 join the frontier — delegate each in turn
+             02 and 03 join the frontier — repeat for each
 ```
 
 Whoever implements a ticket (`.claude/skills/implementation/SKILL.md`) reports back DONE, BLOCKED,
@@ -78,9 +83,13 @@ alone. `AGENTS.md` is never overwritten, only staged as `.template`.
 - **`to-spec`** — synthesizes the conversation into `.claude/tasks/<feature-slug>/SPEC.md`. No interview.
 - **`to-tickets`** — cuts the spec into vertical-slice tickets under
   `.claude/tasks/<feature-slug>/NN-slug.md`, each with a `depends_on` list and a `complexity`
-  rating, then delegates every ticket in the frontier.
-- **`implementation`** — what a coding agent does with one ticket: read it, use `tdd` at agreed
-  seams, implement, report DONE / BLOCKED / PARTIAL.
+  rating. `trivial` tickets are implemented directly, never dispatched; adjacent `trivial`/`small`
+  tickets in the same dependency chain get merged. For every other ticket in the frontier, it writes
+  the seam-level skeleton and tests first, gets a plan approved for `medium`/`large` tickets, then
+  delegates the implementation.
+- **`implementation`** — what a coding agent does with one ticket: read it, fill in the given
+  skeleton using `tdd` at its pre-written seams, never edit a test, stay inside an approved plan's
+  scope, report DONE / BLOCKED / PARTIAL.
 - **`tdd`** / **`debugging`** — the red-green loop and the disciplined bug-diagnosis loop used
   inside `implementation`.
 - **`ticket-review`** — two parallel sub-agents check the diff against this repo's conventions
@@ -94,6 +103,13 @@ Delegation picks a coding agent per ticket:
 - **Codex** / **Google Antigravity** — you're given a ready-to-run command
   (`codex exec "..."` / `antigravity run "..."`). Both read `AGENTS.md` at the repo root on their own,
   so they pick up this project's rules without being told twice.
+
+For `medium`/`large` tickets, the delegate replies with a short plan (approach, files/seams, risks,
+test strategy) before writing any code; the Main Agent approves it, corrects it, or — only when the
+plan depends on something never actually decided — brings it to you. Every dispatch (plan, a
+correction round, or the final implementation) is a fresh, stateless run: nobody resumes a prior
+Codex/Antigravity session, since neither CLI's own context compaction is reliable enough to trust
+with what the delegate needs to remember.
 
 `scripts/tasks_status.py` shows ticket status without opening every file. "update memory" (from
 the memory-bank layer) archives a feature's tickets to `.claude/tasks/_archive/` once every ticket
