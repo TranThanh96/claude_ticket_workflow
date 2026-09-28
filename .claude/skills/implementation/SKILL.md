@@ -80,7 +80,9 @@ the Process below, including flipping the ticket's status and committing.
 
 Ambiguity in requirements or architecture, a test you believe is wrong, or a need to leave the
 approved plan's scope — not a capability limit — is a decision for the Main Agent, never yours to
-make silently. Set the ticket's `status: blocked` and report:
+make silently. Set the ticket's `status: blocked` and report — **skip the status flip if you were
+dispatched via an exchange file**; fold this whole report into `response`'s `blocked_reason` string
+instead, per "Where your reply goes" above:
 
 ```
 # BLOCKED

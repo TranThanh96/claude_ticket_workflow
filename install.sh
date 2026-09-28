@@ -67,6 +67,7 @@ FILES=(
   ".claude/skills/ticket-review/SKILL.md"
   "scripts/tasks_status.py"
   "scripts/exchange_status.py"
+  "scripts/_table.py"
   ".agents/skills/exchange-check.md"
 )
 
@@ -84,6 +85,7 @@ TEMPLATE_OWNED=(
   ".claude/skills/ticket-review/SKILL.md"
   "scripts/tasks_status.py"
   "scripts/exchange_status.py"
+  "scripts/_table.py"
   ".agents/skills/exchange-check.md"
 )
 

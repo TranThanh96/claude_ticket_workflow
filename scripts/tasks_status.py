@@ -16,6 +16,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from _table import print_rows
+
 ROOT = Path(__file__).resolve().parent.parent
 TASKS = ROOT / ".claude" / "tasks"
 FIELDS = ("id", "title", "status", "depends_on", "assigned_to", "complexity")
@@ -82,11 +84,7 @@ def print_table(tickets: list[dict]) -> None:
             t["feature"], t["id"], t["title"], t["status"],
             ",".join(t["depends_on"]) or "-", t["assigned_to"] or "-", t["complexity"] or "-",
         ])
-    widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]))]
-    for i, row in enumerate(rows):
-        print("  ".join(cell.ljust(widths[j]) for j, cell in enumerate(row)))
-        if i == 0:
-            print("  ".join("-" * w for w in widths))
+    print_rows(rows)
 
 
 def main() -> int:

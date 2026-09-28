@@ -86,7 +86,7 @@ class TemplateTestCase(unittest.TestCase):
 class TestInstaller(TemplateTestCase):
     def test_fresh_install_creates_workflow_files(self):
         for rel in ("AGENTS.md", ".claude/rules/workflow.md", ".claude/routing.example.json",
-                    "scripts/tasks_status.py", "scripts/exchange_status.py",
+                    "scripts/tasks_status.py", "scripts/exchange_status.py", "scripts/_table.py",
                     ".agents/skills/exchange-check.md", ".claude/skills/to-tickets/SKILL.md",
                     ".claude/skills/implementation/SKILL.md", ".claude/skills/ticket-review/SKILL.md"):
             self.assertTrue((self.p.root / rel).is_file(), rel)
@@ -219,6 +219,12 @@ class TestExchangeStatus(TemplateTestCase):
         self.write_exchange("demo", "01-ticket", turn="delegate")
         out = self.status("--turn", "delegate", "--paths-only").stdout.strip()
         self.assertEqual(out, ".claude/tasks/demo/01-ticket.exchange.json")
+
+    def test_filter_with_no_match_says_so_distinctly(self):
+        self.write_exchange("demo", "01-ticket", turn="claude")
+        out = self.status("--turn", "delegate").stdout
+        self.assertIn("no exchange files match this filter", out)
+        self.assertNotIn("no exchange files found.", out)
 
     def test_malformed_json_is_an_error(self):
         self.p.write(".claude/tasks/demo/01-ticket.exchange.json", "{not json")

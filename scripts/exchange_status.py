@@ -21,6 +21,8 @@ import argparse
 import json
 from pathlib import Path
 
+from _table import print_rows
+
 ROOT = Path(__file__).resolve().parent.parent
 TASKS = ROOT / ".claude" / "tasks"
 SUFFIX = ".exchange.json"
@@ -60,18 +62,20 @@ def load_exchanges(tasks_dir: Path) -> tuple[list[dict], list[str]]:
     return exchanges, errors
 
 
-def print_table(exchanges: list[dict]) -> None:
-    if not exchanges:
-        print("exchange-status: no exchange files found.")
+def print_table(shown: list[dict], any_exist: bool) -> None:
+    """`any_exist` distinguishes "no exchange files at all" from "none matched the
+    given --turn/--feature filter" — otherwise an empty --turn match looks identical
+    to a genuinely empty tasks/ tree."""
+    if not shown:
+        if any_exist:
+            print("exchange-status: no exchange files match this filter.")
+        else:
+            print("exchange-status: no exchange files found.")
         return
     rows = [list(FIELDS)]
-    for e in exchanges:
+    for e in shown:
         rows.append([str(e[f]) if e[f] not in (None, "") else "-" for f in FIELDS])
-    widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]))]
-    for i, row in enumerate(rows):
-        print("  ".join(cell.ljust(widths[j]) for j, cell in enumerate(row)))
-        if i == 0:
-            print("  ".join("-" * w for w in widths))
+    print_rows(rows)
 
 
 def main() -> int:
@@ -93,7 +97,7 @@ def main() -> int:
         for e in shown:
             print(e["path"])
     else:
-        print_table(shown)
+        print_table(shown, any_exist=bool(exchanges))
 
     for msg in errors:
         print(f"ERROR  {msg}")

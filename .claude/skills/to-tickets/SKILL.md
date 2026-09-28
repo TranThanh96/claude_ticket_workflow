@@ -258,20 +258,23 @@ write's last act is handing the token to the other side by changing `turn` — t
 delegate replies, or to `"none"` once `outcome` is set.
 
 **Before writing `turn: "delegate"` for a brand-new dispatch** (never for a correction/continuation of a
-ticket already active), run `python3 scripts/exchange_status.py --turn delegate`. Any result means some
-other ticket is already active — stop, don't write, and treat it as a bug to investigate (see
-"Duplicate active ticket" below); never dispatch two at once even by accident.
+ticket already active), run `python3 scripts/exchange_status.py --turn delegate --paths-only` — the
+`--paths-only` flag matters: without it, the script always prints *something* (a table header or "no
+exchange files found"), so "any output" would misfire on every call. With `--paths-only`, any output
+at all means some other ticket is already active — stop, don't write, and treat it as a bug to
+investigate (see "Duplicate active ticket" below); never dispatch two at once even by accident.
 
 **Claude writes `request`** — the literal brief for this round (the 4-part plan request from 6.3, or
 the implementation brief, including "never edit test_paths, report BLOCKED instead" and, when
 `approved_plan` is set, "stay within its declared files/seams, report BLOCKED before leaving them")
 — sets `turn: "delegate"`, and arms a `Monitor` watching this exact file path (e.g.
-`inotifywait -m --format '%e %f' <path>`) so the delegate's reply is caught automatically,
-re-arming it if it expires (30-minute cap) before the delegate replies.
+`inotifywait -m --format '%e %f' <path>` on Linux, or `fswatch <path>` on macOS) so the delegate's
+reply is caught automatically, re-arming it if it expires (30-minute cap) before the delegate replies.
 
 **Claude cannot start the delegate itself** (see the note above `<exchange-protocol>`) — tell the
 real user to run the delegate's `exchange-check` skill/slash-command in its own terminal (no
-argument needed: it finds its own pending file via the same `exchange_status.py --turn delegate`).
+argument needed: it finds its own pending file via the same `exchange_status.py --turn delegate
+--paths-only`).
 
 **The delegate reads `request`, does the round's work, and writes `response`** matching one of:
 
@@ -283,21 +286,32 @@ either, once it reads a terminal `response`.
 
 **On the Monitor's notification**, Claude reads `response`:
 
-- Missing, or fails to parse against its schema → treat it as a crash, never assume success;
-  surface it to the real user with whatever's available.
-- Plan reply → the same 4-bucket review as 6.3 (Ungrounded/Factual/Approach/Incomplete), same
-  `plan_round` budget of 3 before escalating instead of another round. Not yet acceptable: append
-  the closed round to `history`, bump `plan_round` (both here and on the ticket), write a new
-  `request` (the correction), `turn: "delegate"` — a fresh Monitor cycle. Acceptable: `stage:
-  "implementation"`, write `approved_plan` (the plan text itself, spelled out — the delegate's own
-  session may have compacted it away by now), a new `request` (the implementation brief), `turn:
-  "delegate"`.
+- Missing, or fails to parse against its schema → treat it as a crash, never assume success. Flip
+  the ticket to `status: blocked` and escalate to the real user with whatever's available — don't
+  try to repair or continue from the exchange file's now-unreliable state yourself; the real user
+  decides whether to fix the file and retry, or supersede the ticket (see below).
+- Plan reply → the same 4-bucket review as 6.3, and the same rule for what counts toward the
+  `plan_round` budget of 3:
+  - **Ungrounded**, or a **Factual/Approach** disagreement once the budget is already spent →
+    escalate now instead of another round: append the closed round to `history`, `outcome:
+    "escalated"`, `turn: "none"`, flip the ticket to `status: blocked`, and bring both positions to
+    the real user.
+  - **Factual inconsistency** or **Approach/quality** (budget not yet spent) → append the closed
+    round to `history`, bump `plan_round` (both here and on the ticket — this is the only bucket
+    that counts toward the budget), write a new `request` (the correction), `turn: "delegate"` — a
+    fresh Monitor cycle.
+  - **Incomplete** → append the closed round to `history`, write a new `request` asking for the
+    missing part, `turn: "delegate"` — do **not** bump `plan_round`; 6.3 explicitly excludes this
+    bucket from the budget.
+  - **Acceptable** → `stage: "implementation"`, write `approved_plan` (the plan text itself, spelled
+    out — the delegate's own session may have compacted it away by now), a new `request` (the
+    implementation brief), `turn: "delegate"`.
 - Implementation reply `DONE` → append to `history`, `outcome: "done"`, `turn: "none"`; flip the
   ticket's `status: done` and commit — Claude's job now, never the delegate's. Continue immediately
   to whatever tickets this one was blocking (see the note at the end of this step) — no need to wait
   for the real user to say so.
-- `BLOCKED` → `outcome: "blocked"`, `turn: "none"`; flip the ticket to `status: blocked`, escalate
-  to the real user.
+- `BLOCKED` → append to `history`, `outcome: "blocked"`, `turn: "none"`; flip the ticket to `status:
+  blocked`, escalate to the real user.
 - `PARTIAL` → treat like a correction round: append to `history`, a new `request`, `turn: "delegate"`.
 
 **Reassigning a ticket away from the delegate mid-flight** (the real user decides to implement it
@@ -318,7 +332,7 @@ own.
 </exchange-protocol>
 
 Mention the routing suggestion for that complexity tier as a hint, not an instruction
-(`.claude/routing.json` may still be blank for these two agents — say so if it is).
+(`.claude/routing.json` may still be blank for whichever external CLI you chose — say so if it is).
 
 Once a ticket completes (a Claude subagent returns, or the exchange protocol reaches `outcome:
 "done"`), the ticket(s) it was blocking may join the frontier — repeat this step for them,
