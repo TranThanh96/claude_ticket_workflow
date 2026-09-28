@@ -75,3 +75,28 @@ A description of the things that are out of scope for this spec.
 Any further notes about the feature.
 
 </spec-template>
+
+### 4. Recommend the next step, and tell the user how to pick it
+
+Estimate size from what you just wrote: count the modules/seams named in **Implementation
+Decisions**, and whether **Out of Scope** implies a wide-refactor / expand-contract sequence
+(see `to-tickets`'s vertical-slice rules). Treat this as a signal, not a hard rule — say so if
+you're unsure.
+
+Report the recommendation and give the user the exact phrase for each path, so they don't have
+to remember `.claude/rules/workflow.md`'s routing table themselves:
+
+- **Looks small** (one seam/module, fits a single context window): "This looks small enough to
+  implement directly — say **'implement it directly'** to proceed that way, or **'cut tickets
+  first'** if you'd rather go through `/to-tickets` anyway."
+- **Looks large** (multiple seams/modules, or needs expand-contract): "This looks big enough to
+  cut into tickets first — run **`/to-tickets`** to continue that way, or say **'implement it
+  directly'** if you want to skip ticket-cutting despite the size. Note: without tickets there's
+  no per-ticket checkpoint, so running out of context mid-implementation leaves nothing to
+  resume from."
+
+If the user picks **'implement it directly'** (whichever recommendation you gave): implement
+using `tdd` at the seams named in **Testing Decisions**, skipping `to-tickets` entirely — do not
+force the ticket-shaped steps of `implementation`'s SKILL.md (there is no ticket file, so no
+`status` field to check). Once done, run `ticket-review` pointing it at this `SPEC.md` as the
+spec source (it already falls back to `SPEC.md` when no ticket path exists).
