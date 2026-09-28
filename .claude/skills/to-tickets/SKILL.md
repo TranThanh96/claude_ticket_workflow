@@ -129,12 +129,21 @@ shape.
 
 #### 6.1 Ask who implements it
 
-Ask the user: **Claude** (subagent) / **an external coding CLI they'll run themselves** (Codex,
-Antigravity, opencode, Cursor's CLI, or anything else — the exchange protocol in 6.4 doesn't care
-which one) / **themselves**.
+This is a real question — ask it every time a ticket is about to be dispatched and wait for the
+answer. Never infer it from what an earlier ticket used (a previous `antigravity` assignment is
+not consent to keep using it), and never resolve it by picking the option that sounds like "the
+user does the work" just because two of the three below both mention the user. The three options,
+worded to not be confusable with each other:
 
-- **Themselves** → leave `status: ready`, do nothing further, skip the rest of this step.
-- Otherwise, continue to 6.2.
+- **(a) A Claude subagent** — you (the Main Agent) spawn it in this session right now.
+- **(b) An external coding CLI, run by the real user in their own terminal** (Codex, Antigravity,
+  opencode, Cursor's CLI, or anything else — the exchange protocol in 6.4 doesn't care which one).
+  The *CLI* does the implementing; the user's only job is starting/nudging it.
+- **(c) The real user writes this ticket's code by hand** — no dispatch, no CLI, nobody automated
+  touches it.
+
+Only **(c)** leaves `status: ready` and does nothing further, skipping the rest of this step.
+**(a)** and **(b)** both continue to 6.2 — do not route either of them into (c)'s no-op.
 
 #### 6.2 Write the skeleton and its tests
 
