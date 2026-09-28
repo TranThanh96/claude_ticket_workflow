@@ -11,11 +11,14 @@ rounds — see that repo's `.claude/skills/to-tickets/SKILL.md` (`<exchange-prot
 full schema and turn-taking rules. This skill is the other half: what you do when the real user runs
 it, telling you it's your turn.
 
-This file is written for Antigravity's own custom-skill format (frontmatter `name`/`description` →
-auto slash command). If you're wiring up a different CLI (Codex, opencode, Cursor's CLI, or
-anything else), define an equivalent in whatever custom-command mechanism it supports; if it has
-none, the real user pastes `request`'s content directly each round instead of running a command —
-the exchange protocol itself doesn't care which CLI is on this side of the file.
+This file is written for Antigravity's own custom-skill format: frontmatter `name`/`description` →
+auto slash command, and it must live at `.agents/skills/exchange-check/SKILL.md` — a directory named
+after the skill, not a flat `exchange-check.md` — or Antigravity won't pick it up at all. If you're
+wiring up a different CLI (Codex, opencode, Cursor's CLI, or anything else), define an equivalent in
+whatever custom-command mechanism it supports, checking its own naming/location convention rather
+than assuming this one; if it has none, the real user pastes `request`'s content directly each round
+instead of running a command — the exchange protocol itself doesn't care which CLI is on this side
+of the file.
 
 ## Process
 

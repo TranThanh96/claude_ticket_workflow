@@ -148,7 +148,7 @@ AGENTS.md                               # pointer for non-Claude coding agents (
 .claude/skills/debugging/               # disciplined bug-diagnosis loop
 .claude/skills/ticket-review/           # Standards + Spec review of a diff against its ticket
 .claude/tasks/                          # <feature-slug>/SPEC.md + NN-slug.md tickets, _archive/ once done
-.agents/skills/exchange-check.md        # Antigravity-side example of the delegate's exchange-check step
+.agents/skills/exchange-check/SKILL.md  # Antigravity-side example of the delegate's exchange-check step
 scripts/tasks_status.py                 # ticket status table + depends_on validation
 scripts/exchange_status.py              # find the exchange file currently awaiting the delegate or Claude
 ```

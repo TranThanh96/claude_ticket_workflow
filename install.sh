@@ -11,7 +11,7 @@
 # Spec-first planning for large features, and tickets you can delegate to Claude or any
 # external coding CLI you run yourself (Codex, Antigravity, ...): grilling / to-spec /
 # to-tickets / implementation / tdd / debugging / ticket-review, plus AGENTS.md,
-# scripts/tasks_status.py, scripts/exchange_status.py, and .agents/skills/exchange-check.md.
+# scripts/tasks_status.py, scripts/exchange_status.py, and .agents/skills/exchange-check/SKILL.md.
 #
 # This tier assumes the memory bank is already installed in the target (decisions.md,
 # patterns.md, troubleshooting.md — the workflow skills read and cite them). See
@@ -68,7 +68,7 @@ FILES=(
   "scripts/tasks_status.py"
   "scripts/exchange_status.py"
   "scripts/_table.py"
-  ".agents/skills/exchange-check.md"
+  ".agents/skills/exchange-check/SKILL.md"
 )
 
 MERGE_FILES=("AGENTS.md")
@@ -86,7 +86,7 @@ TEMPLATE_OWNED=(
   "scripts/tasks_status.py"
   "scripts/exchange_status.py"
   "scripts/_table.py"
-  ".agents/skills/exchange-check.md"
+  ".agents/skills/exchange-check/SKILL.md"
 )
 
 # True when replacing the file could lose work: uncommitted or untracked

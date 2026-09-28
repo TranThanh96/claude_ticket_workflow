@@ -87,7 +87,7 @@ class TestInstaller(TemplateTestCase):
     def test_fresh_install_creates_workflow_files(self):
         for rel in ("AGENTS.md", ".claude/rules/workflow.md", ".claude/routing.example.json",
                     "scripts/tasks_status.py", "scripts/exchange_status.py", "scripts/_table.py",
-                    ".agents/skills/exchange-check.md", ".claude/skills/to-tickets/SKILL.md",
+                    ".agents/skills/exchange-check/SKILL.md", ".claude/skills/to-tickets/SKILL.md",
                     ".claude/skills/implementation/SKILL.md", ".claude/skills/ticket-review/SKILL.md"):
             self.assertTrue((self.p.root / rel).is_file(), rel)
 
