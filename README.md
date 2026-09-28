@@ -106,19 +106,25 @@ Delegation picks a coding agent per ticket:
 
 - **Claude** — a subagent is spawned in-session immediately, model chosen from `.claude/routing.json`
   by the ticket's complexity.
-- **Codex** / **Google Antigravity** — the Main Agent runs them itself, as a background subprocess
-  (`codex exec "..."` / `antigravity run --dangerously-skip-permissions "..."`), no manual copy-paste
-  needed. Both read `AGENTS.md` at the repo root on their own, so they pick up this project's rules
-  without being told twice.
+- **Any other coding CLI you run yourself** — Codex, Antigravity, opencode, Cursor's CLI, or
+  anything else; the exchange protocol below doesn't care which one. **You** run it yourself, in
+  your own terminal; the Main Agent never spawns it as a subprocess. Most such CLIs auto-deny their
+  own tool-permission prompts in headless mode unless launched with a flag that skips them all, and
+  Claude Code's own auto-mode classifier refuses to let Claude spawn a process with that flag on
+  your behalf — so this tier assumes you're the one running it. Codex and Antigravity both read
+  `AGENTS.md` at the repo root on their own, so they pick up this project's rules without being told
+  twice; check whether yours does too.
 
 For `medium`/`large` tickets, the delegate replies with a short plan (approach, files/seams, risks,
 test strategy) before writing any code; the Main Agent approves it, corrects it, or — only when the
-plan depends on something never actually decided — brings it to you. Every dispatch (plan, a
-correction round, or the final implementation) is a fresh, stateless run: nobody resumes a prior
-Codex/Antigravity session, since neither CLI's own context compaction is reliable enough to trust
-with what the delegate needs to remember. Each round exchanges one task/report JSON pair next to the
-ticket (`.claude/tasks/<feature>/NN-slug/`); the Main Agent dispatches in the background and reads
-the report once the process exits — see `to-tickets`'s step 6.4 for the exact protocol.
+plan depends on something never actually decided — brings it to you. Each ticket dispatched to an
+external CLI gets exactly one JSON file (`.claude/tasks/<feature>/NN-slug.exchange.json`),
+mutated in place across every round rather than resumed as a conversation — the Main Agent watches
+it automatically (a background file-watch, no polling) and reacts the moment you flip its `turn`
+field, but starting the delegate on a new round is still on you: run its `exchange-check`
+skill/slash-command in its own terminal, no argument needed. See `to-tickets`'s `<exchange-protocol>`
+for the exact schema and turn-taking rules, and `scripts/exchange_status.py` for finding whichever
+ticket is currently waiting on which side.
 
 `scripts/tasks_status.py` shows ticket status without opening every file. "update memory" (from
 the memory-bank layer) archives a feature's tickets to `.claude/tasks/_archive/` once every ticket
@@ -131,7 +137,7 @@ cost to shipping both.
 ## What's included
 
 ```
-AGENTS.md                               # pointer for non-Claude coding agents (Codex, Antigravity)
+AGENTS.md                               # pointer for non-Claude coding agents (e.g. Codex, Antigravity)
 .claude/routing.example.json            # complexity → model per coding agent (copy to routing.json)
 .claude/rules/workflow.md               # always loaded: which skill for which kind of task
 .claude/skills/grilling/                # resolve ambiguity before spending a spec on it
@@ -142,7 +148,9 @@ AGENTS.md                               # pointer for non-Claude coding agents (
 .claude/skills/debugging/               # disciplined bug-diagnosis loop
 .claude/skills/ticket-review/           # Standards + Spec review of a diff against its ticket
 .claude/tasks/                          # <feature-slug>/SPEC.md + NN-slug.md tickets, _archive/ once done
+.agents/skills/exchange-check.md        # Antigravity-side example of the delegate's exchange-check step
 scripts/tasks_status.py                 # ticket status table + depends_on validation
+scripts/exchange_status.py              # find the exchange file currently awaiting the delegate or Claude
 ```
 
 ## Developing this template

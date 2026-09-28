@@ -73,7 +73,7 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
 
 - The diff command and commit list.
 - The path or contents of the ticket(s) and/or `SPEC.md`.
-- If the ticket went through the plan-approval gate (`to-tickets` step 6.3), the approved plan's declared files/seams and approach, plus any `BLOCKED` reports in the ticket's history. For a Codex/Antigravity ticket dispatched via the JSON protocol (`to-tickets` step 6.4), these live in `.claude/tasks/<feature-slug>/NN-slug/`: `implementation.task.json`'s `approved_plan` field, and any round's `report.json` with `status: "BLOCKED"`.
+- If the ticket went through the plan-approval gate (`to-tickets` step 6.3), the approved plan's declared files/seams and approach, plus any `BLOCKED` reports in the ticket's history. For a ticket dispatched to an external CLI via the exchange protocol (`to-tickets` step 6.4), these live in `.claude/tasks/<feature-slug>/NN-slug.exchange.json`: its `approved_plan` field, and any round in `history` (or the live `response`) with `status: "BLOCKED"`.
 - The brief: "Report: (a) requirements the spec/ticket asked for that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where the implementation looks wrong; (d) if an approved plan was supplied, whether the files/seams actually touched in the diff match its declared list — a mismatch with no corresponding BLOCKED report in the ticket's history is its own finding, separate from (b). Quote the ticket/spec/plan line for each finding. Under 400 words."
 
 If the spec is missing, skip the Spec sub-agent and note this in the final report.

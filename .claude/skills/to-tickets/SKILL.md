@@ -45,9 +45,9 @@ Give each ticket a **complexity** rating — `trivial | small | medium | large` 
 
 <sizing-rules>
 
-Dispatching a ticket isn't free: a Claude subagent and a Codex/Antigravity process both start with
-zero context, so every dispatch re-pays the cost of loading the surrounding code. Size tickets with
-that cost in mind:
+Dispatching a ticket isn't free: a Claude subagent and an external CLI process (Codex, Antigravity,
+or anything else) both start with zero context, so every dispatch re-pays the cost of loading the
+surrounding code. Size tickets with that cost in mind:
 
 - A ticket rated `trivial` isn't worth a dispatch at all: mark it for **direct implementation**
   instead of writing it up as a ticket file (see step 6).
@@ -129,7 +129,9 @@ shape.
 
 #### 6.1 Ask who implements it
 
-Ask the user: **Claude** (subagent) / **Codex** / **Antigravity** / themselves.
+Ask the user: **Claude** (subagent) / **an external coding CLI they'll run themselves** (Codex,
+Antigravity, opencode, Cursor's CLI, or anything else — the exchange protocol in 6.4 doesn't care
+which one) / **themselves**.
 
 - **Themselves** → leave `status: ready`, do nothing further, skip the rest of this step.
 - Otherwise, continue to 6.2.
@@ -196,84 +198,129 @@ Once the plan is acceptable, set `status: plan-approved` and continue to 6.4.
   and, for `medium`/`large` tickets, the approved plan — not the conversation the plan round
   produced; a fresh subagent only needs the ticket, the contract, and the approved plan itself.
   Point it at `.claude/skills/implementation/SKILL.md`.
-- **Codex** / **Antigravity** → set `assigned_to` and `status: in-progress`, then dispatch it
-  yourself as a background subprocess using the JSON protocol below. Don't ask the user to run
-  anything by hand.
+- **Any other external CLI** (Codex, Antigravity, opencode, Cursor's CLI, or anything else) → set
+  `assigned_to` and `status: in-progress`, then dispatch through the exchange protocol below. **The
+  real user runs the delegate CLI themselves, in their own terminal — never spawn it as a
+  subprocess.** Most such CLIs' own tool-permission model auto-denies anything they need (network
+  reads, writes outside a narrow default, etc.) unless launched with a flag that skips all of their
+  permission prompts; Claude Code's own auto-mode classifier denies Claude spawning a process with
+  that flag itself ("Create Unsafe Agents"). There is no way around this from inside Claude Code —
+  don't try another tool, another quoting trick, or another invocation shape to get the same
+  outcome; ask the real user to run it instead.
 
-Every dispatch — the plan request, a correction round, and the final execute — is its own fresh,
-stateless process. Never resume or continue a prior Codex/Antigravity session: Codex's headless
-`exec` mode is documented to skip auto-compaction (a long resumed session risks crashing outright),
-and Antigravity's auto-compaction is lossy (it can silently drop a constraint the delegate needs).
-Curate what each fresh process needs yourself — the ticket, the skeleton and tests, and, on a
-correction round, the delegate's last plan plus your specific feedback — rather than relying on
-either CLI's own memory of the conversation.
+<exchange-protocol>
 
-<json-dispatch-protocol>
-
-Each round of a Codex/Antigravity dispatch (a plan request, a plan-correction round, or the final
-implementation) exchanges exactly one request/response pair of JSON files, next to the ticket:
+Each ticket dispatched to an external CLI gets exactly **one** file, next to the ticket, mutated
+in place across every round — never a new file per round:
 
 ```
-.claude/tasks/<feature-slug>/NN-slug.md          # the ticket itself, unchanged
-.claude/tasks/<feature-slug>/NN-slug/            # this ticket's JSON exchange, one folder
-  plan-round-1.task.json
-  plan-round-1.report.json
-  plan-round-2.task.json                         # only if a correction round happened
-  plan-round-2.report.json
-  implementation.task.json
-  implementation.report.json
+.claude/tasks/<feature-slug>/NN-slug.md              # the ticket itself — Claude is the only writer
+.claude/tasks/<feature-slug>/NN-slug.exchange.json    # the only channel between Claude and the delegate
 ```
 
-**Write the task JSON** before every dispatch:
+Unlike a Claude subagent's fresh call, the delegate's own CLI session is **not** reset per round: it
+persists across a ticket's plan / plan-correction / implementation rounds (asking the real user to
+close and reopen their terminal every round was judged not worth the friction this tier is trying to
+remove). It only gets manually reset — the real user runs that CLI's own context-reset command, not
+Claude — once a `medium`/`large` ticket reaches a terminal outcome, before the next ticket starts;
+this bounds how much of that CLI's own lossy auto-compaction risk can accumulate across a whole
+feature, while still accepting it within a single ticket's handful of rounds. `trivial`/`small`
+tickets don't need this reset at all.
+
+**Schema** (write atomically — temp file + rename — on both sides, never a partial write the other
+side could read mid-flight):
 
 ```json
 {
-  "round": "plan | plan-correction | implementation",
   "ticket_path": ".claude/tasks/<feature-slug>/NN-slug.md",
+  "stage": "plan | plan_correction | implementation",
+  "plan_round": 1,
+  "turn": "delegate | claude | none",
+  "outcome": null,
   "skeleton_paths": ["..."],
   "test_paths": ["..."],
-  "prior_plan": null,
-  "feedback": null,
   "approved_plan": null,
-  "instructions": "<the literal brief for this round: the 4-part plan request from 6.3, or the implementation brief, including 'never edit test_paths, report BLOCKED instead' and, when approved_plan is set, 'stay within its declared files/seams, report BLOCKED before leaving them'>",
-  "report_path": ".claude/tasks/<feature-slug>/NN-slug/<round-name>.report.json"
+  "request": {},
+  "response": null,
+  "history": [],
+  "updated_at": "<ISO 8601>"
 }
 ```
 
-`prior_plan` and `feedback` are set only on a `plan-correction` round. `approved_plan` is set only
-on the `implementation` round, and must be the plan text itself, spelled out — the fresh process
-never saw the earlier round that produced it and has no memory to fall back on.
+`outcome` is `null` while a round is in flight; `"done"`, `"blocked"`, or `"escalated"` once the
+ticket reaches a terminal state (mirrors the ticket's own `status`, which only Claude ever writes);
+`"superseded"` if the ticket gets reassigned away from this delegate mid-flight (see below).
+`plan_round` mirrors the ticket's own `plan_rounds` field — Claude is the sole writer of both, so
+keep them in sync; the delegate never needs to read the ticket file to know which round it's on.
 
-**Dispatch it**: run the CLI via `Bash` with `run_in_background: true`, instructing it only to read
-the task JSON, follow its `instructions` field, write its reply to `report_path` matching the
-schema below, then exit.
+**Single-writer turn-taking**: only the side named by `turn` may write to the file, ever, and every
+write's last act is handing the token to the other side by changing `turn` — to `"claude"` once the
+delegate replies, or to `"none"` once `outcome` is set.
 
-- Codex: `codex exec "Read the task JSON at <task-path> and follow its instructions field exactly. Follow .claude/skills/implementation/SKILL.md."`
-- Antigravity: the same prompt via `antigravity run --dangerously-skip-permissions "..."` — the flag
-  is required for non-interactive read/write access; without it, every file operation stalls on a
-  permission prompt no one is there to answer.
+**Before writing `turn: "delegate"` for a brand-new dispatch** (never for a correction/continuation of a
+ticket already active), run `python3 scripts/exchange_status.py --turn delegate`. Any result means some
+other ticket is already active — stop, don't write, and treat it as a bug to investigate (see
+"Duplicate active ticket" below); never dispatch two at once even by accident.
 
-**On completion** (the background job's own finish notification — no polling, no file watcher
-needed, since these are one-shot processes that exit when done): read `report_path`.
+**Claude writes `request`** — the literal brief for this round (the 4-part plan request from 6.3, or
+the implementation brief, including "never edit test_paths, report BLOCKED instead" and, when
+`approved_plan` is set, "stay within its declared files/seams, report BLOCKED before leaving them")
+— sets `turn: "delegate"`, and arms a `Monitor` watching this exact file path (e.g.
+`inotifywait -m --format '%e %f' <path>`) so the delegate's reply is caught automatically,
+re-arming it if it expires (30-minute cap) before the delegate replies.
 
-- Missing, or fails to parse against the schema → treat it as a crash, never assume success. Set
-  `status: blocked` and surface it to the user with whatever stderr/log is available.
-- Parses cleanly → continue as normal: the 4-bucket review for a plan reply (6.3), or DONE/BLOCKED/
-  PARTIAL handling for an implementation reply (see `implementation`'s report format).
+**Claude cannot start the delegate itself** (see the note above `<exchange-protocol>`) — tell the
+real user to run the delegate's `exchange-check` skill/slash-command in its own terminal (no
+argument needed: it finds its own pending file via the same `exchange_status.py --turn delegate`).
 
-Report JSON schemas:
+**The delegate reads `request`, does the round's work, and writes `response`** matching one of:
 
 - Plan round: `{"type": "plan", "approach": str, "files_seams": [str], "risks": str, "test_strategy": str}`
 - Implementation round: `{"type": "report", "status": "DONE"|"BLOCKED"|"PARTIAL", "summary": str, "files_changed": [str], "blocked_reason": str|null}`
 
-The `NN-slug/` folder travels with the ticket when a completed feature is archived to
+then sets `turn: "claude"`. It never touches the ticket `.md` or commits anything — only Claude does
+either, once it reads a terminal `response`.
+
+**On the Monitor's notification**, Claude reads `response`:
+
+- Missing, or fails to parse against its schema → treat it as a crash, never assume success;
+  surface it to the real user with whatever's available.
+- Plan reply → the same 4-bucket review as 6.3 (Ungrounded/Factual/Approach/Incomplete), same
+  `plan_round` budget of 3 before escalating instead of another round. Not yet acceptable: append
+  the closed round to `history`, bump `plan_round` (both here and on the ticket), write a new
+  `request` (the correction), `turn: "delegate"` — a fresh Monitor cycle. Acceptable: `stage:
+  "implementation"`, write `approved_plan` (the plan text itself, spelled out — the delegate's own
+  session may have compacted it away by now), a new `request` (the implementation brief), `turn:
+  "delegate"`.
+- Implementation reply `DONE` → append to `history`, `outcome: "done"`, `turn: "none"`; flip the
+  ticket's `status: done` and commit — Claude's job now, never the delegate's. Continue immediately
+  to whatever tickets this one was blocking (see the note at the end of this step) — no need to wait
+  for the real user to say so.
+- `BLOCKED` → `outcome: "blocked"`, `turn: "none"`; flip the ticket to `status: blocked`, escalate
+  to the real user.
+- `PARTIAL` → treat like a correction round: append to `history`, a new `request`, `turn: "delegate"`.
+
+**Reassigning a ticket away from the delegate mid-flight** (the real user decides to implement it
+themselves, or hand it to someone else, before a terminal outcome): append the current round to
+`history`, set `outcome: "superseded"`, `turn: "none"` — *before* changing `assigned_to`. A dangling
+`turn: "delegate"` on an abandoned ticket is exactly what the pre-dispatch check above exists to catch.
+
+**Duplicate active ticket** (`exchange_status.py --turn delegate` or `--turn claude` ever returns more
+than one file): this should be structurally impossible under the sequential, one-ticket-at-a-time
+model this protocol assumes — treat it as a bug, not a race to resolve by picking one. Whichever
+side notices first stops and reports it to the real user without acting on either file; only the
+real user (or Claude, once told) decides which one is stale and corrects it.
+
+The `NN-slug.exchange.json` file travels with the ticket when a completed feature is archived to
 `.claude/tasks/_archive/` — it's part of the ticket's record, not scratch space to clean up on its
 own.
 
-</json-dispatch-protocol>
+</exchange-protocol>
 
 Mention the routing suggestion for that complexity tier as a hint, not an instruction
 (`.claude/routing.json` may still be blank for these two agents — say so if it is).
 
-Once a ticket completes (report received, or subagent returns), the ticket(s) it was blocking may
-join the frontier — repeat this step for them.
+Once a ticket completes (a Claude subagent returns, or the exchange protocol reaches `outcome:
+"done"`), the ticket(s) it was blocking may join the frontier — repeat this step for them,
+immediately and without waiting to be told, regardless of which delegate handled the ticket that
+just finished.

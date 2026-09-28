@@ -12,9 +12,10 @@ Don't force every task through every stage. Pick the row that matches, top to bo
 - `grilling`: resolve ambiguity before spending a spec on it. Skip for trivial tasks.
 - `to-spec`: synthesize the conversation into a spec at `.claude/tasks/<feature-slug>/SPEC.md`. No interview.
 - `to-tickets`: break the spec into `.claude/tasks/<feature-slug>/NN-slug.md` tickets, then delegate each
-  unblocked one (spawn a Claude subagent, or hand you a command for Codex/Antigravity).
-- `implementation`: what a coding agent (Claude subagent, or you running Codex/Antigravity) does with one
-  ticket — read it, use `tdd` at agreed seams, implement, report back.
+  unblocked one (spawn a Claude subagent, or tell you when to run an external CLI you run yourself —
+  Codex, Antigravity, or anything else — through its own exchange-check step).
+- `implementation`: what a coding agent (Claude subagent, or you running an external CLI yourself)
+  does with one ticket — read it, use `tdd` at agreed seams, implement, report back.
 - `ticket-review`: does the diff match the ticket/spec and this repo's conventions? Two axes, run
   separately from the built-in `/code-review` (that one hunts bugs; this one checks conformance).
 - `update-memory-bank`: as today, plus archiving a feature's tickets once every one is `done`.

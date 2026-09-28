@@ -8,9 +8,10 @@
 #   INIT_TICKET_WORKFLOW_TEMPLATE  path to this template repo (default: the directory
 #                                  this script lives in)
 #
-# Spec-first planning for large features, and tickets you can delegate across Claude,
-# Codex, and Antigravity: grilling / to-spec / to-tickets / implementation / tdd /
-# debugging / ticket-review, plus AGENTS.md and scripts/tasks_status.py.
+# Spec-first planning for large features, and tickets you can delegate to Claude or any
+# external coding CLI you run yourself (Codex, Antigravity, ...): grilling / to-spec /
+# to-tickets / implementation / tdd / debugging / ticket-review, plus AGENTS.md,
+# scripts/tasks_status.py, scripts/exchange_status.py, and .agents/skills/exchange-check.md.
 #
 # This tier assumes the memory bank is already installed in the target (decisions.md,
 # patterns.md, troubleshooting.md — the workflow skills read and cite them). See
@@ -65,6 +66,8 @@ FILES=(
   ".claude/skills/debugging/SKILL.md"
   ".claude/skills/ticket-review/SKILL.md"
   "scripts/tasks_status.py"
+  "scripts/exchange_status.py"
+  ".agents/skills/exchange-check.md"
 )
 
 MERGE_FILES=("AGENTS.md")
@@ -80,6 +83,8 @@ TEMPLATE_OWNED=(
   ".claude/skills/debugging/SKILL.md"
   ".claude/skills/ticket-review/SKILL.md"
   "scripts/tasks_status.py"
+  "scripts/exchange_status.py"
+  ".agents/skills/exchange-check.md"
 )
 
 # True when replacing the file could lose work: uncommitted or untracked

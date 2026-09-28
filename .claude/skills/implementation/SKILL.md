@@ -1,6 +1,6 @@
 ---
 name: implementation
-description: "Implement one ticket from .claude/tasks/, whether you're a Claude subagent, or a human running Codex/Antigravity yourself."
+description: "Implement one ticket from .claude/tasks/, whether you're a Claude subagent, or a human running an external CLI (Codex, Antigravity, or anything else) yourself."
 disable-model-invocation: true
 source: https://github.com/mattpocock/skills
 source_skill: skills/engineering/implement
@@ -36,14 +36,19 @@ Check the ticket's `status` before doing anything else:
 
 ## Where your reply goes
 
-If you were dispatched with a **task JSON** (it has a `report_path` field — this is how `to-tickets`
-step 6.4 dispatches Codex/Antigravity), write your reply there as JSON, matching the schema its
-`instructions` field describes, then exit. Don't also reply in chat — no one is reading it. A
-BLOCKED outcome still goes to `report_path`: fold this doc's "If you get blocked" template into the
-`blocked_reason` string as one prose block, with `status: "BLOCKED"`.
+If you were dispatched via an **exchange file** (`.claude/tasks/<feature-slug>/NN-slug.exchange.json`
+— this is how `to-tickets`'s `<exchange-protocol>` dispatches to an external CLI), read the round's
+brief from its `request` field, do the work, then write your reply into its `response` field
+matching the schema that section describes and set `turn: "claude"` — leave `history` alone, that's
+the Main Agent's to manage when it decides whether this round is closed. Don't also reply in chat —
+no one is reading it. Never touch the ticket file's frontmatter and never commit anything
+yourself — the Main Agent owns both, once it reads your `response`. A BLOCKED outcome still goes
+into `response`: fold this doc's "If you get blocked" template into a `blocked_reason` string as one
+prose block, with `status: "BLOCKED"`.
 
-If there's no task JSON (you're a Claude subagent returning a result, or a human running this
-yourself and reporting in chat), use the markdown templates below instead.
+If there's no exchange file (you're a Claude subagent returning a result, or a human running this
+yourself and reporting in chat), use the markdown templates below instead, and follow every step of
+the Process below, including flipping the ticket's status and committing.
 
 ## Process
 
@@ -65,8 +70,10 @@ yourself and reporting in chat), use the markdown templates below instead.
 7. Run typechecking regularly, single test files regularly, and the full test suite once at the end.
 8. Self-review, then use `ticket-review` (not the built-in `/code-review` — that one hunts bugs;
    `ticket-review` checks this diff against the ticket and this repo's conventions).
-9. Flip the ticket's frontmatter to `status: done` (or `blocked`, see below).
-10. Commit your work to the current branch.
+9. Flip the ticket's frontmatter to `status: done` (or `blocked`, see below) — **skip this step if
+   you were dispatched via an exchange file**; the Main Agent does it once it reads your `response`.
+10. Commit your work to the current branch — **skip this step too under an exchange-file
+    dispatch**, same reason.
 11. Report back using the template below.
 
 ## If you get blocked

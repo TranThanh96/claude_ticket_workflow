@@ -45,6 +45,9 @@ class Project:
     def status(self, *args: str) -> subprocess.CompletedProcess:
         return self.sh("python3", "scripts/tasks_status.py", *args, check=False)
 
+    def exchange_status(self, *args: str) -> subprocess.CompletedProcess:
+        return self.sh("python3", "scripts/exchange_status.py", *args, check=False)
+
 
 class TemplateTestCase(unittest.TestCase):
     def setUp(self) -> None:
@@ -72,11 +75,19 @@ class TemplateTestCase(unittest.TestCase):
         body = "---\n" + "\n".join(f"{k}: {v}" for k, v in fm.items()) + "\n---\nbody\n"
         self.p.write(f".claude/tasks/{feature}/{ticket_id}-ticket.md", body)
 
+    def write_exchange(self, feature: str, ticket_slug: str, **fields) -> None:
+        data = {"ticket_path": f".claude/tasks/{feature}/{ticket_slug}.md", "stage": "plan",
+                 "plan_round": 1, "turn": "delegate", "outcome": None, "skeleton_paths": [],
+                 "test_paths": [], "approved_plan": None, "request": {}, "response": None,
+                 "history": [], "updated_at": "2026-01-01T00:00:00Z", **fields}
+        self.p.write(f".claude/tasks/{feature}/{ticket_slug}.exchange.json", json.dumps(data))
+
 
 class TestInstaller(TemplateTestCase):
     def test_fresh_install_creates_workflow_files(self):
         for rel in ("AGENTS.md", ".claude/rules/workflow.md", ".claude/routing.example.json",
-                    "scripts/tasks_status.py", ".claude/skills/to-tickets/SKILL.md",
+                    "scripts/tasks_status.py", "scripts/exchange_status.py",
+                    ".agents/skills/exchange-check.md", ".claude/skills/to-tickets/SKILL.md",
                     ".claude/skills/implementation/SKILL.md", ".claude/skills/ticket-review/SKILL.md"):
             self.assertTrue((self.p.root / rel).is_file(), rel)
 
@@ -166,6 +177,59 @@ class TestTasksStatus(TemplateTestCase):
         self.p.write(".claude/tasks/demo/SPEC.md", "# Spec\n")
         self.p.write(".claude/tasks/_archive/old-feature/01-ticket.md",
                      "---\nid: 01\ntitle: old\nstatus: done\n---\n")
+        out = self.status().stdout
+        self.assertIn("demo", out)
+        self.assertNotIn("old-feature", out)
+
+
+class TestExchangeStatus(TemplateTestCase):
+    def status(self, *args: str) -> subprocess.CompletedProcess:
+        return self.p.exchange_status(*args)
+
+    def test_silent_without_tasks_dir(self):
+        res = self.status()
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("no exchange files found", res.stdout)
+
+    def test_lists_and_filters_by_turn(self):
+        self.write_exchange("demo", "01-ticket", turn="delegate")
+        self.write_exchange("demo", "02-ticket", turn="claude")
+        out = self.status().stdout
+        self.assertIn("01-ticket", out)
+        self.assertIn("02-ticket", out)
+        delegate_only = self.status("--turn", "delegate").stdout
+        self.assertIn("01-ticket", delegate_only)
+        self.assertNotIn("02-ticket", delegate_only)
+
+    def test_filters_by_feature(self):
+        self.write_exchange("demo-a", "01-ticket")
+        self.write_exchange("demo-b", "01-ticket")
+        out = self.status("--feature", "demo-a").stdout
+        self.assertIn("demo-a", out)
+        self.assertNotIn("demo-b", out)
+
+    def test_duplicate_turn_is_an_error(self):
+        self.write_exchange("demo", "01-ticket", turn="delegate")
+        self.write_exchange("demo", "02-ticket", turn="delegate")
+        res = self.status("--turn", "delegate")
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("more than one exchange file has turn", res.stdout)
+
+    def test_paths_only_prints_bare_path(self):
+        self.write_exchange("demo", "01-ticket", turn="delegate")
+        out = self.status("--turn", "delegate", "--paths-only").stdout.strip()
+        self.assertEqual(out, ".claude/tasks/demo/01-ticket.exchange.json")
+
+    def test_malformed_json_is_an_error(self):
+        self.p.write(".claude/tasks/demo/01-ticket.exchange.json", "{not json")
+        res = self.status()
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("failed to parse as JSON", res.stdout)
+
+    def test_archived_files_are_ignored(self):
+        self.write_exchange("demo", "01-ticket")
+        self.p.write(".claude/tasks/_archive/old-feature/01-ticket.exchange.json",
+                     json.dumps({"turn": "delegate"}))
         out = self.status().stdout
         self.assertIn("demo", out)
         self.assertNotIn("old-feature", out)

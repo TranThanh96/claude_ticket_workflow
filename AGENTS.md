@@ -1,6 +1,6 @@
 <!--
-  Pointer for non-Claude coding agents (Codex CLI, Google Antigravity — both
-  auto-load this file). Claude Code reads CLAUDE.md and ignores this file
+  Pointer for non-Claude coding agents (e.g. Codex CLI, Google Antigravity — both
+  auto-load this file; check whether yours does too). Claude Code reads CLAUDE.md and ignores this file
   whenever CLAUDE.md exists, so nothing here duplicates into its context.
 -->
 
