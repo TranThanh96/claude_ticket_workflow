@@ -109,8 +109,8 @@ entries relevant to THIS ticket — cite the section, not just "read memory">
 
 `status` moves through `ready → plan-pending → plan-approved → in-progress → done` for a `medium`/
 `large` ticket dispatched to a delegate (`blocked` at any point it stops for a decision); `trivial`
-tickets never get a file at all, and `small` tickets and self-assigned ones skip straight from
-`ready` to `in-progress` — see step 6.
+tickets never get a file at all, and `small` tickets skip straight from `ready` to `in-progress` —
+see step 6.
 
 Avoid specific file paths or code snippets beyond what's needed to locate the seam: they go stale fast. Exception: if a prototype produced a snippet that encodes a decision more precisely than prose can (state machine, reducer, schema, type shape), inline it and note briefly that it came from a prototype.
 
@@ -129,21 +129,18 @@ shape.
 
 #### 6.1 Ask who implements it
 
-This is a real question — ask it every time a ticket is about to be dispatched and wait for the
-answer. Never infer it from what an earlier ticket used (a previous `antigravity` assignment is
-not consent to keep using it), and never resolve it by picking the option that sounds like "the
-user does the work" just because two of the three below both mention the user. The three options,
-worded to not be confusable with each other:
+Every dispatched ticket gets implemented by an agent — never by the real user coding it by hand.
+This is still a real question to ask every time a ticket is about to be dispatched, and wait for
+the answer; never infer it from what an earlier ticket used (a previous `antigravity` assignment
+is not consent to keep using it for this one). The two options, worded to not be confusable with
+each other:
 
 - **(a) A Claude subagent** — you (the Main Agent) spawn it in this session right now.
 - **(b) An external coding CLI, run by the real user in their own terminal** (Codex, Antigravity,
   opencode, Cursor's CLI, or anything else — the exchange protocol in 6.4 doesn't care which one).
   The *CLI* does the implementing; the user's only job is starting/nudging it.
-- **(c) The real user writes this ticket's code by hand** — no dispatch, no CLI, nobody automated
-  touches it.
 
-Only **(c)** leaves `status: ready` and does nothing further, skipping the rest of this step.
-**(a)** and **(b)** both continue to 6.2 — do not route either of them into (c)'s no-op.
+Both continue to 6.2.
 
 #### 6.2 Write the skeleton and its tests
 
@@ -163,8 +160,8 @@ Before dispatching, write the seam-level skeleton this ticket needs directly int
   reconfirm it, closing the gap `tdd` describes for headless runs. The tests must fail (red) against
   the stub bodies.
 
-Required for every dispatched ticket, `small` included — only the "themselves" and direct-
-implementation paths skip it.
+Required for every dispatched ticket, `small` included — only the direct-implementation path
+(`trivial` tickets, step 6's opening paragraph) skips it.
 
 #### 6.3 For `medium`/`large` tickets: get a plan before code
 

@@ -29,7 +29,7 @@ to-tickets writes:   01 (no blockers)   02 (blocked by 01)   03 (blocked by 01)
                             ▼
        01: trivial? implement it directly, no dispatch at all
        01: otherwise, write its skeleton + tests, then delegate to:
-                 Claude subagent | Codex | Antigravity | yourself
+                 Claude subagent | an external CLI you run yourself (Codex, Antigravity, ...)
                             │
         medium/large: plan → Main Agent reviews (approve / correct / escalate) → implement
         trivial/small: implement straight away
