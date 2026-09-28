@@ -21,3 +21,9 @@ Don't force every task through every stage. Pick the row that matches, top to bo
 - `update-memory-bank`: as today, plus archiving a feature's tickets once every one is `done`.
 
 Model per ticket complexity: `.claude/routing.json` (copy from `.claude/routing.example.json`).
+
+Asked to add or drop a delegate CLI (Codex, Antigravity, ...)? Don't guess the format — open
+`.claude/routing.json`, read its `_comment`, and follow it: add the CLI's name to the `delegates`
+array, and add a matching `{ "trivial": "", "small": "", "medium": "", "large": "" }` block for it
+if one doesn't already exist (`antigravity`/`codex` already have one). Takes effect on the next
+ticket dispatched — no reinstall, no `/init-agent` re-run.

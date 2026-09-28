@@ -130,17 +130,24 @@ shape.
 #### 6.1 Ask who implements it
 
 Every dispatched ticket gets implemented by an agent — never by the real user coding it by hand.
-This is still a real question to ask every time a ticket is about to be dispatched, and wait for
-the answer; never infer it from what an earlier ticket used (a previous `antigravity` assignment
-is not consent to keep using it for this one). The two options, worded to not be confusable with
-each other:
+Read `delegates` from `.claude/routing.json` (fall back to `.claude/routing.example.json`'s
+default, `["claude"]`, if the project has no `routing.json` yet):
 
-- **(a) A Claude subagent** — you (the Main Agent) spawn it in this session right now.
-- **(b) An external coding CLI, run by the real user in their own terminal** (Codex, Antigravity,
-  opencode, Cursor's CLI, or anything else — the exchange protocol in 6.4 doesn't care which one).
-  The *CLI* does the implementing; the user's only job is starting/nudging it.
+- **Only `"claude"` listed** → no other coding CLI is configured for this project. Skip the
+  question — there's nothing to choose between — say so in one line, and go straight to 6.2.
+- **More than one delegate listed** → this is still a real question to ask every time a ticket is
+  about to be dispatched, and wait for the answer; never infer it from what an earlier ticket used
+  (a previous `antigravity` assignment is not consent to keep using it for this one). Offer only
+  the delegates actually listed, worded to not be confusable with each other, e.g.:
+  - **(a) A Claude subagent** — you (the Main Agent) spawn it in this session right now.
+  - **(b) An external coding CLI, run by the real user in their own terminal** — name whichever
+    of `delegates` this covers (Codex, Antigravity, opencode, Cursor's CLI, ...; the exchange
+    protocol in 6.4 doesn't care which one). The *CLI* does the implementing; the user's only job
+    is starting/nudging it.
 
-Both continue to 6.2.
+Both branches continue to 6.2. If the real user edits `delegates` later — adding or dropping a
+CLI — that takes effect starting with the next ticket dispatched; no need to reinstall or re-run
+`/init-agent`.
 
 #### 6.2 Write the skeleton and its tests
 
@@ -337,8 +344,12 @@ own.
 
 </exchange-protocol>
 
-Mention the routing suggestion for that complexity tier as a hint, not an instruction
-(`.claude/routing.json` may still be blank for whichever external CLI you chose — say so if it is).
+Mention the routing suggestion for that complexity tier as a hint, not an instruction. If
+`.claude/routing.json` has a block for that delegate, its value may still be blank — say so if it
+is. If the delegate has no block there at all (e.g. it was added to `delegates` by hand without
+one), say that too ("no routing suggestion configured for `<cli>`") instead of silently mentioning
+nothing — the real user picks the model themselves either way, but they should know it's missing,
+not assume there was never one to give.
 
 Once a ticket completes (a Claude subagent returns, or the exchange protocol reaches `outcome:
 "done"`), the ticket(s) it was blocking may join the frontier — repeat this step for them,

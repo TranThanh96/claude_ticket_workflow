@@ -75,7 +75,9 @@ prompt for your coding agent.
 
 Then copy `.claude/routing.example.json` to `.claude/routing.json` and fill in the `codex` /
 `antigravity` model names once you've actually used them (the `claude` block uses model aliases
-and never goes stale).
+and never goes stale). Those two blocks are advisory only — Claude never spawns either CLI or
+picks its model, so a filled-in name is just a hint the Main Agent mentions when dispatching;
+you decide what model to actually run.
 
 **Upgrade** an existing install: `install.sh --upgrade path/to/project`. Template-owned files
 (the workflow skills, `routing.example.json`, `tasks_status.py`) are replaced with the new
@@ -101,6 +103,12 @@ alone. `AGENTS.md` is never overwritten, only staged as `.template`.
 - **`ticket-review`** — two parallel sub-agents check the diff against this repo's conventions
   (**Standards**) and against the ticket (**Spec**) — different from the built-in `/code-review`,
   which hunts bugs and doesn't know what the ticket asked for.
+
+Which of these you get asked about is gated by `delegates` in `.claude/routing.json` —
+`/init-agent` asks once at setup time (Claude only, or Claude plus another CLI) and writes the
+answer there; edit the list by hand any time afterward to add or drop a CLI, no reinstall needed.
+If it only lists `claude`, `to-tickets` skips the question entirely and dispatches straight to a
+subagent.
 
 Delegation picks a coding agent per ticket:
 
