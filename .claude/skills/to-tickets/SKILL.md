@@ -135,19 +135,52 @@ default, `["claude"]`, if the project has no `routing.json` yet):
 
 - **Only `"claude"` listed** → no other coding CLI is configured for this project. Skip the
   question — there's nothing to choose between — say so in one line, and go straight to 6.2.
-- **More than one delegate listed** → this is still a real question to ask every time a ticket is
-  about to be dispatched, and wait for the answer; never infer it from what an earlier ticket used
-  (a previous `antigravity` assignment is not consent to keep using it for this one). Offer only
-  the delegates actually listed, worded to not be confusable with each other, e.g.:
-  - **(a) A Claude subagent** — you (the Main Agent) spawn it in this session right now.
-  - **(b) An external coding CLI, run by the real user in their own terminal** — name whichever
-    of `delegates` this covers (Codex, Antigravity, opencode, Cursor's CLI, ...; the exchange
-    protocol in 6.4 doesn't care which one). The *CLI* does the implementing; the user's only job
-    is starting/nudging it.
+- **At least one external CLI listed too** → check `delegate_lock` in `.claude/routing.json` for
+  this feature-slug before asking anything:
+  - **Already locked** (`delegate_lock["<feature-slug>"] == "external_cli"`) → say so in one line
+    ("this feature is locked to an external CLI, dispatching without asking") and go straight to
+    6.2, treating this ticket the same as if the real user had just answered (2)/(3) below. Never
+    re-ask while the lock holds — that's what locking it in means.
+  - **Not locked** → ask, and wait for the answer. Never infer it from what an earlier *unlocked*
+    ticket's answer was (answering "external CLI, just this once" for ticket 01 is not consent to
+    keep using it for ticket 02) — offer exactly these three choices every time, worded to not be
+    confusable with each other:
+    - **(1) A Claude subagent, just this ticket** — you (the Main Agent) spawn it in this session
+      right now. The next ticket in the frontier asks again from scratch.
+    - **(2) An external coding CLI, just this ticket** — run by the real user in their own
+      terminal (Codex, Antigravity, opencode, Cursor's CLI, or anything else — the exchange
+      protocol in 6.4 only watches for `turn: "delegate"`, it doesn't care which CLI acts on it,
+      so don't ask which one). The next ticket in the frontier asks again from scratch.
+    - **(3) An external coding CLI, locked in for every remaining ticket in this feature** — same
+      dispatch as (2) for this ticket, but also write `delegate_lock["<feature-slug>"]:
+      "external_cli"` to `.claude/routing.json` now (atomically — temp file, then rename). No more
+      asking for this feature until it's unlocked (below) or archived.
 
-Both branches continue to 6.2. If the real user edits `delegates` later — adding or dropping a
-CLI — that takes effect starting with the next ticket dispatched; no need to reinstall or re-run
-`/init-agent`.
+Both branches continue to 6.2.
+
+**Unlocking mid-feature**: if the real user says, in plain language, that they want to change who
+implements the rest of this feature (e.g. "switch back to Claude", "ask me again for this one"),
+remove that feature's `delegate_lock` entry from `.claude/routing.json` right away and ask the
+three-choice question again for the next ticket — no special command syntax needed, this is an
+ordinary conversational request like any other.
+
+**Re-running `to-tickets`** for a feature that already has tickets (cutting more, or resuming after
+a break) always starts this question fresh: remove any existing `delegate_lock` entry for that
+feature-slug first, even if it was locked before, then follow the flow above as if this were the
+first ticket. A lock from a previous cutting pass is not consent for this one either.
+
+**On archive**: once `update-memory-bank` archives a feature's tickets to `.claude/tasks/_archive/`,
+remove that feature's `delegate_lock` entry too — it only means anything for a feature still being
+dispatched, and a stale entry could otherwise silently skip the question if the feature-slug is
+ever reused.
+
+If the real user edits `delegates` later — adding or dropping a CLI — that takes effect starting
+with the next ticket dispatched; no need to reinstall or re-run `/init-agent`.
+
+If that edit drops every external CLI from `delegates` (leaving only `"claude"`, or emptying the
+list), clear every `delegate_lock` entry right then, even for features the user didn't mention —
+a lock with no external CLI left to point to is stale, and leaving it in place means it silently
+re-applies, unasked, if an external CLI is ever added back while that feature is still open.
 
 #### 6.2 Write the skeleton and its tests
 

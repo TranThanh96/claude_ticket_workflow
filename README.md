@@ -123,6 +123,14 @@ Delegation picks a coding agent per ticket:
   `AGENTS.md` at the repo root on their own, so they pick up this project's rules without being told
   twice; check whether yours does too.
 
+Which one handles a given ticket is decided by a three-way question `to-tickets` asks right after
+cutting tickets (skipped entirely if `delegates` only lists `claude`): Claude for just this ticket,
+an external CLI for just this ticket, or an external CLI locked in for every remaining ticket in
+the feature — asked fresh again on the next ticket unless you picked the lock. The lock lives in
+`.claude/routing.json`'s `delegate_lock`, keyed by feature-slug; say so in plain language any time
+to unlock it early, and it's cleared automatically once the feature is archived or `to-tickets`
+re-cuts it.
+
 For `medium`/`large` tickets, the delegate replies with a short plan (approach, files/seams, risks,
 test strategy) before writing any code; the Main Agent approves it, corrects it, or — only when the
 plan depends on something never actually decided — brings it to you. Each ticket dispatched to an
