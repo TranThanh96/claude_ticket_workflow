@@ -88,23 +88,17 @@ the ticket file to know which round it's on.
 write's last act is handing the token to the other side by changing `turn` — to `"claude"` once the
 delegate replies, or to `"none"` once `outcome` is set.
 
-**Before writing `turn: "delegate"` for a brand-new dispatch** (never for a correction/continuation of
-a ticket already active), run `python3 scripts/exchange_status.py --turn delegate --paths-only` — the
-`--paths-only` flag matters: without it, the script always prints *something* (a table header or "no
-exchange files found"), so "any output" would misfire on every call. With `--paths-only`, any output
-at all means some other ticket is already active — stop, don't write, and treat it as a bug to
-investigate (see "Duplicate active ticket" below); never dispatch two at once even by accident.
+**Initial dispatch vs. subsequent rounds**: `to-tickets` performs the pre-dispatch safety check
+and writes the initial exchange file with `turn: "delegate"`. When handed a new ticket, arm your `Monitor`
+watching this exact file path (e.g. `inotifywait -m --format '%e %f' <path>` on Linux, or `fswatch <path>`
+on macOS) immediately, and tell the real user to run the delegate's `exchange-check` skill/slash-command
+in its own terminal (no argument needed: it finds its pending file via `exchange_status.py --turn delegate --paths-only`).
 
-**You write `request`** — the literal brief for this round (the 4-part plan request, a plan
-correction, or the implementation brief, including "never edit `test_paths`, report BLOCKED instead"
-and, when `approved_plan` is set, "stay within its declared files/seams, report BLOCKED before
-leaving them") — set `turn: "delegate"`, and arm a `Monitor` watching this exact file path (e.g.
-`inotifywait -m --format '%e %f' <path>` on Linux, or `fswatch <path>` on macOS) so the delegate's
-reply is caught automatically, re-arming it if it expires (30-minute cap) before the delegate replies.
-
-**You cannot start the delegate yourself** — tell the real user to run the delegate's `exchange-check`
-skill/slash-command in its own terminal (no argument needed: it finds its own pending file via the
-same `exchange_status.py --turn delegate --paths-only`).
+For subsequent rounds (plan corrections or implementation dispatch after plan approval), **you write
+`request`** — the literal brief for that round (a plan correction, or the implementation brief,
+including "never edit `test_paths`, report BLOCKED instead" and, when `approved_plan` is set, "stay within
+its declared files/seams, report BLOCKED before leaving them") — set `turn: "delegate"`, and re-arm the
+`Monitor`, re-arming it if it expires (30-minute cap) before the delegate replies.
 
 **The delegate reads `request`, does the round's work, and writes `response`** matching one of:
 

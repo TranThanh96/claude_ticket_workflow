@@ -262,13 +262,16 @@ out of this file.
   ticket, the contract, and that request. Point it at `.claude/skills/implementation/SKILL.md`. The
   instant it returns, invoke `watch-delegate` with its reply — there's no Monitor to arm here, the
   call is synchronous.
-- **Any other external CLI** (Codex, Antigravity, opencode, Cursor's CLI, or anything else) → set
-  `assigned_to` and `status: in-progress`, write the exchange file (`ticket_path`, `stage` from 6.3,
-  `skeleton_paths`, `test_paths`, `request` from 6.3, `turn: "delegate"`), then invoke
-  `watch-delegate` — it owns arming the Monitor and everything after. **The real user runs the
-  delegate CLI themselves, in their own terminal — never spawn it as a subprocess.** Most such CLIs'
-  own tool-permission model auto-denies anything they need (network reads, writes outside a narrow
-  default, etc.) unless launched with a flag that skips all of their permission prompts; Claude
+- **Any other external CLI** (Codex, Antigravity, opencode, Cursor's CLI, or anything else) →
+  first run `python3 scripts/exchange_status.py --turn delegate --paths-only` — the `--paths-only`
+  flag matters: without it, the script always prints something, so "any output" would misfire. If any
+  path is printed, stop (another ticket is already active; investigate before dispatching). Otherwise,
+  set `assigned_to` and `status: in-progress`, write the exchange file atomically (`ticket_path`,
+  `stage` from 6.3, `skeleton_paths`, `test_paths`, `request` from 6.3, `turn: "delegate"`), then
+  invoke `watch-delegate` — it arms the Monitor and supervises all rounds from here. **The real user
+  runs the delegate CLI themselves, in their own terminal — never spawn it as a subprocess.** Most
+  such CLIs' own tool-permission model auto-denies anything they need (network reads, writes outside a
+  narrow default, etc.) unless launched with a flag that skips all of their permission prompts; Claude
   Code's own auto-mode classifier denies Claude spawning a process with that flag itself ("Create
   Unsafe Agents"). There is no way around this from inside Claude Code — don't try another tool,
   another quoting trick, or another invocation shape to get the same outcome; ask the real user to
