@@ -20,8 +20,11 @@ yourself, even if they're available to you — those decisions belong to whoever
 If the ticket or the code is ambiguous, stop and emit a **BLOCKED** report instead of guessing.
 
 If you are not Claude Code (Codex, Antigravity, or anything else), also explicitly read
-`.claude/rules/core-rules.md` and `.claude/rules/coding-guidelines.md` now — only Claude Code
-auto-loads these.
+`.claude/rules/core-rules.md`, `.claude/rules/coding-guidelines.md`, and `.claude/skills/tdd/SKILL.md`
+now — only Claude Code auto-loads the first two or can invoke the third as a skill. You don't have a
+`tdd` skill of your own (your own skill surface is whatever you defined under `.agents/skills/`,
+e.g. `exchange-check`); `.claude/skills/tdd/SKILL.md` is a plain file to read and follow, not a
+command to look for on your own side.
 
 ## Two modes
 
@@ -37,7 +40,7 @@ Check the ticket's `status` before doing anything else:
 ## Where your reply goes
 
 If you were dispatched via an **exchange file** (`.claude/tasks/<feature-slug>/NN-slug.exchange.json`
-— this is how `to-tickets`'s `<exchange-protocol>` dispatches to an external CLI), read the round's
+— this is how `watch-delegate`'s `<exchange-protocol>` dispatches to an external CLI), read the round's
 brief from its `request` field, do the work, then write your reply into its `response` field
 matching the schema that section describes and set `turn: "claude"` — leave `history` alone, that's
 the Main Agent's to manage when it decides whether this round is closed. Don't also reply in chat —
@@ -58,8 +61,15 @@ the Process below, including flipping the ticket's status and committing.
 3. Use `tdd` at the seams the ticket already names, filling in the given skeleton bodies. If the
    ticket doesn't name them and the interface shape itself is in question, that's not yours to
    resolve — emit a BLOCKED report (see below) instead of picking a seam yourself.
-4. **Never edit a test file you were given.** If you believe one of them is wrong, stop and emit a
-   BLOCKED report explaining why — don't work around it and don't change it yourself.
+4. **Never edit a test file you were given.** If you believe one is wrong, stop and emit a BLOCKED
+   report explaining why — don't work around it and don't change it yourself. Only the Main Agent
+   writes tests here as a rule — the one exception is a seam the approved plan already named as
+   implementation-emergent (something you can only get right once you're actually wiring the code,
+   like exact call ordering): write that test now, but declare it in `new_tests` (exchange-file
+   dispatch) or call it out explicitly in your report (chat dispatch), never silently inside
+   `files_changed` — it's flagged for a reason, the Main Agent reviews it specifically before
+   accepting. If a seam needs a test that isn't already there and the plan *didn't* name it as this
+   kind of exception, that's a BLOCKED report, not something to add yourself.
 5. **Stay inside the approved plan's declared files/seams and approach.** If you discover mid-task
    that you need to touch something outside that scope, or need a materially different approach,
    stop and emit a BLOCKED report *before* making that change — don't do it first and mention it in
@@ -73,7 +83,9 @@ the Process below, including flipping the ticket's status and committing.
 9. Flip the ticket's frontmatter to `status: done` (or `blocked`, see below) — **skip this step if
    you were dispatched via an exchange file**; the Main Agent does it once it reads your `response`.
 10. Commit your work to the current branch — **skip this step too under an exchange-file
-    dispatch**, same reason.
+    dispatch**, same reason. Reference the ticket's path in the commit message (e.g. a trailer like
+    `Ticket: .claude/tasks/<feature-slug>/NN-slug.md`) — `ticket-review`'s first move is to look for
+    exactly that in the commit log before falling back to asking the user.
 11. Report back using the template below.
 
 ## If you get blocked
@@ -82,7 +94,11 @@ Ambiguity in requirements or architecture, a test you believe is wrong, or a nee
 approved plan's scope — not a capability limit — is a decision for the Main Agent, never yours to
 make silently. Set the ticket's `status: blocked` and report — **skip the status flip if you were
 dispatched via an exchange file**; fold this whole report into `response`'s `blocked_reason` string
-instead, per "Where your reply goes" above:
+instead, per "Where your reply goes" above. **If you're a Claude subagent (no exchange file),** also
+append this whole report verbatim to the ticket's `## Plan History` section (create it if absent)
+before returning — you're the only one who will ever see this report; the Main Agent that reads your
+return value can act on it now, but nothing else persists it for `ticket-review` or a later session
+unless you write it here yourself:
 
 ```
 # BLOCKED

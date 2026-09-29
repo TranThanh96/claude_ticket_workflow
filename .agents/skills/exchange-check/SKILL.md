@@ -7,9 +7,9 @@ description: "Pick up whichever ticket is currently waiting on you in the claude
 
 The Main Agent (Claude Code, in a separate session) dispatches tickets to you through a single JSON
 file per ticket at `.claude/tasks/<feature-slug>/NN-slug.exchange.json`, mutated in place across
-rounds — see that repo's `.claude/skills/to-tickets/SKILL.md` (`<exchange-protocol>` section) for the
-full schema and turn-taking rules. This skill is the other half: what you do when the real user runs
-it, telling you it's your turn.
+rounds — see that repo's `.claude/skills/watch-delegate/SKILL.md` (`<exchange-protocol>` section) for
+the full schema and turn-taking rules. This skill is the other half: what you do when the real user
+runs it, telling you it's your turn.
 
 This file is written for Antigravity's own custom-skill format: frontmatter `name`/`description` →
 auto slash command, and it must live at `.agents/skills/exchange-check/SKILL.md` — a directory named
@@ -35,14 +35,19 @@ of the file.
 6. Follow `request`'s instructions exactly:
    - `stage: "plan"` or `"plan_correction"` → reply with a plan only — approach, files/seams,
      risks, test strategy. **No code.** Don't touch the codebase.
-   - `stage: "implementation"` → implement using the `tdd` skill at the seams `test_paths` already
-     name. **Never edit a test file you were given** — if you believe one is wrong, that's a
-     BLOCKED reply, not something to fix yourself. Stay inside `approved_plan`'s declared
-     files/seams if one is set; leaving that scope is also a BLOCKED reply, made *before* you leave
-     it, not after.
+   - `stage: "implementation"` → implement following `.claude/skills/tdd/SKILL.md`'s red-green-refactor
+     discipline at the seams `test_paths` already name. That's a plain file in the Main Agent's repo
+     for you to read and follow — you don't have your own `tdd` skill (your skill surface is whatever
+     you defined under `.agents/skills/`, i.e. just this file), so don't go looking for one. **Never edit a test file you were given.** Only the Main Agent writes tests here as a
+     rule — the one exception is a seam `approved_plan` already named as implementation-emergent
+     (something only knowable once the code is actually wired, like exact call ordering): write
+     that test now, but list it in `new_tests` with why, never silently inside `files_changed`. If a
+     seam needs a test that isn't already there and wasn't named as this exception, that's a BLOCKED
+     reply, not something to add yourself. Stay inside `approved_plan`'s declared files/seams if one
+     is set; leaving that scope is also a BLOCKED reply, made *before* you leave it, not after.
 7. Write your reply into the file's `response` field, matching exactly one of these shapes:
    - Plan round: `{"type": "plan", "approach": str, "files_seams": [str], "risks": str, "test_strategy": str}`
-   - Implementation round: `{"type": "report", "status": "DONE"|"BLOCKED"|"PARTIAL", "summary": str, "files_changed": [str], "blocked_reason": str|null}`
+   - Implementation round: `{"type": "report", "status": "DONE"|"BLOCKED"|"PARTIAL", "summary": str, "files_changed": [str], "new_tests": [{"path": str, "reason": str}], "blocked_reason": str|null}`
 8. Set `turn: "claude"` and `updated_at` to now. Write the whole file atomically (temp file, then
    rename) — never leave a half-written file for the Main Agent to read.
 9. Leave `history`, `ticket_path`, `stage`, and `plan_round` exactly as you found them — the Main
