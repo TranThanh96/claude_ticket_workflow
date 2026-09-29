@@ -127,6 +127,16 @@ that's ticket `01`). Do the following for a ticket once it's about to be dispatc
 the whole chain — a skeleton written too early goes stale if an earlier ticket changes the code's
 shape.
 
+**One ticket at a time, start to finish (6.1 through 6.4), even when several tickets are
+simultaneously in the frontier** (no dependency edge between them, both eligible right now). Never
+bundle more than one ticket's version of 6.1's question into a single UI turn — e.g. one multi-select
+form asking who implements `#01`/`#02`/`#03` all at once — finish one ticket's dispatch before
+starting the next one's 6.1. This matters specifically because of the lock in 6.1: a lock written
+while handling an earlier ticket must make every later ticket in the same frontier skip the question
+entirely, and a batched ask can't know that lock exists yet at the point it's built — asking all
+three at once is exactly how you end up re-asking (and re-answering) the same lock decision three
+times instead of once.
+
 #### 6.1 Ask who implements it
 
 Every dispatched ticket gets implemented by an agent — never by the real user coding it by hand.
