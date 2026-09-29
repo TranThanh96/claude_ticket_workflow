@@ -7,13 +7,18 @@ Don't force every task through every stage. Pick the row that matches, top to bo
 | Trivial (obvious rename, tiny isolated fix) | implement directly → test |
 | Bug | `debugging` → fix → test → `ticket-review` → troubleshooting.md if the cause wasn't obvious |
 | Small feature | `to-spec` → `implementation` → test → `ticket-review` |
-| Large feature / architectural | `grilling` → `to-spec` → `to-tickets` → delegate → `implementation` → test → `ticket-review` → update memory |
+| Large feature / architectural | `grilling` → `to-spec` → `to-tickets` → `watch-delegate` → `implementation` → test → `ticket-review` → update memory |
 
 - `grilling`: resolve ambiguity before spending a spec on it. Skip for trivial tasks.
 - `to-spec`: synthesize the conversation into a spec at `.claude/tasks/<feature-slug>/SPEC.md`. No interview.
-- `to-tickets`: break the spec into `.claude/tasks/<feature-slug>/NN-slug.md` tickets, then delegate each
-  unblocked one (spawn a Claude subagent, or tell you when to run an external CLI you run yourself —
-  Codex, Antigravity, or anything else — through its own exchange-check step).
+- `to-tickets`: break the spec into `.claude/tasks/<feature-slug>/NN-slug.md` tickets, write each one's
+  skeleton/tests, and write its first dispatch request (spawn a Claude subagent, or tell you when to
+  run an external CLI you run yourself — Codex, Antigravity, or anything else — through its own
+  exchange-check step), then hand off to `watch-delegate`.
+- `watch-delegate`: supervises one dispatched ticket from that first request through to done/blocked —
+  negotiates plan rounds, verifies a DONE reply (reruns tests, checks test legitimacy and scope
+  adherence) before accepting it, and triages a BLOCKED report: self-corrects the ticket when the
+  answer is already in `SPEC.md`/`decisions.md`/`patterns.md`, otherwise escalates to you.
 - `implementation`: what a coding agent (Claude subagent, or you running an external CLI yourself)
   does with one ticket — read it, use `tdd` at agreed seams, implement, report back.
 - `ticket-review`: does the diff match the ticket/spec and this repo's conventions? Two axes, run

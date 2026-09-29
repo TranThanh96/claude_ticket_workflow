@@ -93,6 +93,7 @@ depends_on: [<ids this ticket is blocked by; omit or leave empty if none>]
 assigned_to: null
 complexity: trivial|small|medium|large
 plan_rounds: 0
+impl_rounds: 0
 ---
 
 **What to build:** <the end-to-end behaviour this ticket makes work, from the user's perspective,
@@ -111,6 +112,14 @@ entries relevant to THIS ticket — cite the section, not just "read memory">
 `large` ticket dispatched to a delegate (`blocked` at any point it stops for a decision); `trivial`
 tickets never get a file at all, and `small` tickets skip straight from `ready` to `in-progress` —
 see step 6.
+
+A `## Plan History` section is *not* part of the initial template — `watch-delegate` appends it
+(creating it on first use) only for a `medium`/`large` ticket dispatched to a **Claude subagent**:
+approved plans, `BLOCKED` reports, self-corrections, and DONE-verification verdicts all land there
+(see `.claude/skills/watch-delegate/SKILL.md` and `.claude/skills/implementation/SKILL.md`). A ticket
+dispatched to an external CLI never needs this section — that history already lives durably in its
+own `NN-slug.exchange.json`, which survives archiving; a Claude subagent's session and plan-review
+conversation don't survive anything, so the ticket file is the only durable record for those.
 
 Avoid specific file paths or code snippets beyond what's needed to locate the seam: they go stale fast. Exception: if a prototype produced a snippet that encodes a decision more precisely than prose can (state machine, reducer, schema, type shape), inline it and note briefly that it came from a prototype.
 
@@ -196,6 +205,18 @@ re-applies, unasked, if an external CLI is ever added back while that feature is
 
 Before dispatching, write the seam-level skeleton this ticket needs directly into the codebase:
 
+- A seam isn't only a brand-new function that needs a stub — wiring a new call or branch into an
+  *existing* function (no separate stub possible there) is a seam too, whenever it changes
+  observable behavior. For a wiring seam you still write its test now, red against today's code —
+  there's no stub to point at, the test itself is what pins the contract — and its file still goes
+  in `test_paths`.
+
+  **Exception**: if a correct test for that seam can only be written with a fact that doesn't exist
+  yet — not "what should this return" but something like exact call ordering, timing, or sequencing
+  inside the existing function that only becomes fixed once someone actually wires the code (e.g. a
+  test needs to know whether a new RNG-consuming call lands before or after an existing one, to seed
+  it deterministically) — don't guess. See "Delegate-authored tests" under step 6.4's exchange
+  protocol for how that case is handled instead.
 - One skeleton function per seam you've decided needs a test for this ticket — never a skeleton for
   an internal helper; factoring inside a seam is the delegate's own call. This is also what keeps a
   ticket from decomposing into too many tiny functions: the seam count already drives the ticket's
@@ -213,179 +234,45 @@ Before dispatching, write the seam-level skeleton this ticket needs directly int
 Required for every dispatched ticket, `small` included — only the direct-implementation path
 (`trivial` tickets, step 6's opening paragraph) skips it.
 
-#### 6.3 For `medium`/`large` tickets: get a plan before code
+#### 6.3 Write the first request, then hand off
 
-`trivial`/`small` tickets skip straight to 6.4. For `medium`/`large` tickets, set
-`status: plan-pending` and dispatch a **plan request**, not an implementation request:
+Your job for this ticket ends at the first dispatch. Everything from here — plan-round negotiation,
+verifying a DONE reply, triaging a BLOCKED, retries, escalation — is
+`.claude/skills/watch-delegate/SKILL.md`'s job, not yours; see its note on why that content moved
+out of this file.
 
-> Read the ticket at `.claude/tasks/<feature-slug>/NN-slug.md`, `AGENTS.md`, and the skeleton/tests
-> at `<paths>`. Do not write any implementation code yet. Reply with a plan covering exactly these
-> four parts: (a) your approach, in prose, (b) the files/seams you expect to touch, (c) risks or
-> points you're unsure of, (d) how you'll verify the change. No code in the reply.
+- **`trivial`/`small` ticket** → no plan step. Skip straight to 6.4's implementation dispatch.
+- **`medium`/`large` ticket** → set `status: plan-pending` and write the first request as a **plan
+  request**, not an implementation request. If this is going through the exchange protocol (an
+  external CLI), this first write is also where you set `stage: "plan"` in the exchange file —
+  `exchange-check` step 6 branches its own behavior on this field, so a first dispatch that never
+  sets it leaves the delegate with no documented case to match:
 
-Review the reply against `SPEC.md`, `decisions.md`, `patterns.md`, and the ticket itself, and sort
-any problem into exactly one bucket:
+  > Read the ticket at `.claude/tasks/<feature-slug>/NN-slug.md`, `AGENTS.md`, and the skeleton/tests
+  > at `<paths>`. Do not write any implementation code yet. Reply with a plan covering exactly these
+  > four parts: (a) your approach, in prose, (b) the files/seams you expect to touch, (c) risks or
+  > points you're unsure of, (d) how you'll verify the change. No code in the reply.
 
-| Bucket | What it means | What you do | Counts toward the round budget? |
-| --- | --- | --- | --- |
-| **Ungrounded** | The plan assumes something that appears nowhere in the project's knowledge | Escalate to the real user now — this is a decision nobody has made yet | No |
-| **Factual inconsistency** | The plan contradicts something already known (current code, a recorded decision, another `done` ticket) | Correct it directly in your reply, ask for a revised plan | Yes |
-| **Approach/quality** | The plan is grounded but you judge a different approach is better | Explain why, ask for a revised plan | Yes |
-| **Incomplete** | The plan is missing one of its four required parts | Ask for the missing part | No |
-
-Increment the ticket's `plan_rounds` for every round that counts. At `plan_rounds: 3`, the next
-"factual inconsistency" or "approach" disagreement escalates to the real user instead of another
-round — summarize both positions rather than looping further.
-
-**An escalation can hand back a new fact, not just a decision.** If the real user's answer settles
-something concrete that constrains testable behavior (a threshold, a format, a specific rule) and
-the tests written in 6.2 don't already verify it, update or add to those tests now — via `tdd`,
-still at the seam level, still red against the current stub — before the plan can be marked
-approved. The delegate's only feedback loop is the tests it was given and can never edit; a fact
-that never enters them is a fact the delegate has no way to be checked against.
-
-Once the plan is acceptable, set `status: plan-approved` and continue to 6.4.
-
-#### 6.4 Dispatch the implementation
+#### 6.4 Dispatch, then hand off to `watch-delegate`
 
 - **Claude** → set `assigned_to: claude`, `status: in-progress`, look up its model in
   `.claude/routing.json` (fall back to `.claude/routing.example.json`) by `complexity`, and call the
   `Agent` tool with that model. The prompt is the ticket file content plus the skeleton/test paths
-  and, for `medium`/`large` tickets, the approved plan — not the conversation the plan round
-  produced; a fresh subagent only needs the ticket, the contract, and the approved plan itself.
-  Point it at `.claude/skills/implementation/SKILL.md`.
+  and, for `medium`/`large` tickets, the plan request from 6.3 — a fresh subagent only needs the
+  ticket, the contract, and that request. Point it at `.claude/skills/implementation/SKILL.md`. The
+  instant it returns, invoke `watch-delegate` with its reply — there's no Monitor to arm here, the
+  call is synchronous.
 - **Any other external CLI** (Codex, Antigravity, opencode, Cursor's CLI, or anything else) → set
-  `assigned_to` and `status: in-progress`, then dispatch through the exchange protocol below. **The
-  real user runs the delegate CLI themselves, in their own terminal — never spawn it as a
-  subprocess.** Most such CLIs' own tool-permission model auto-denies anything they need (network
-  reads, writes outside a narrow default, etc.) unless launched with a flag that skips all of their
-  permission prompts; Claude Code's own auto-mode classifier denies Claude spawning a process with
-  that flag itself ("Create Unsafe Agents"). There is no way around this from inside Claude Code —
-  don't try another tool, another quoting trick, or another invocation shape to get the same
-  outcome; ask the real user to run it instead.
-
-<exchange-protocol>
-
-Each ticket dispatched to an external CLI gets exactly **one** file, next to the ticket, mutated
-in place across every round — never a new file per round:
-
-```
-.claude/tasks/<feature-slug>/NN-slug.md              # the ticket itself — Claude is the only writer
-.claude/tasks/<feature-slug>/NN-slug.exchange.json    # the only channel between Claude and the delegate
-```
-
-Unlike a Claude subagent's fresh call, the delegate's own CLI session is **not** reset per round: it
-persists across a ticket's plan / plan-correction / implementation rounds (asking the real user to
-close and reopen their terminal every round was judged not worth the friction this tier is trying to
-remove). It only gets manually reset — the real user runs that CLI's own context-reset command, not
-Claude — once a `medium`/`large` ticket reaches a terminal outcome, before the next ticket starts;
-this bounds how much of that CLI's own lossy auto-compaction risk can accumulate across a whole
-feature, while still accepting it within a single ticket's handful of rounds. `trivial`/`small`
-tickets don't need this reset at all.
-
-**Schema** (write atomically — temp file + rename — on both sides, never a partial write the other
-side could read mid-flight):
-
-```json
-{
-  "ticket_path": ".claude/tasks/<feature-slug>/NN-slug.md",
-  "stage": "plan | plan_correction | implementation",
-  "plan_round": 1,
-  "turn": "delegate | claude | none",
-  "outcome": null,
-  "skeleton_paths": ["..."],
-  "test_paths": ["..."],
-  "approved_plan": null,
-  "request": {},
-  "response": null,
-  "history": [],
-  "updated_at": "<ISO 8601>"
-}
-```
-
-`outcome` is `null` while a round is in flight; `"done"`, `"blocked"`, or `"escalated"` once the
-ticket reaches a terminal state (mirrors the ticket's own `status`, which only Claude ever writes);
-`"superseded"` if the ticket gets reassigned away from this delegate mid-flight (see below).
-`plan_round` mirrors the ticket's own `plan_rounds` field — Claude is the sole writer of both, so
-keep them in sync; the delegate never needs to read the ticket file to know which round it's on.
-
-**Single-writer turn-taking**: only the side named by `turn` may write to the file, ever, and every
-write's last act is handing the token to the other side by changing `turn` — to `"claude"` once the
-delegate replies, or to `"none"` once `outcome` is set.
-
-**Before writing `turn: "delegate"` for a brand-new dispatch** (never for a correction/continuation of a
-ticket already active), run `python3 scripts/exchange_status.py --turn delegate --paths-only` — the
-`--paths-only` flag matters: without it, the script always prints *something* (a table header or "no
-exchange files found"), so "any output" would misfire on every call. With `--paths-only`, any output
-at all means some other ticket is already active — stop, don't write, and treat it as a bug to
-investigate (see "Duplicate active ticket" below); never dispatch two at once even by accident.
-
-**Claude writes `request`** — the literal brief for this round (the 4-part plan request from 6.3, or
-the implementation brief, including "never edit test_paths, report BLOCKED instead" and, when
-`approved_plan` is set, "stay within its declared files/seams, report BLOCKED before leaving them")
-— sets `turn: "delegate"`, and arms a `Monitor` watching this exact file path (e.g.
-`inotifywait -m --format '%e %f' <path>` on Linux, or `fswatch <path>` on macOS) so the delegate's
-reply is caught automatically, re-arming it if it expires (30-minute cap) before the delegate replies.
-
-**Claude cannot start the delegate itself** (see the note above `<exchange-protocol>`) — tell the
-real user to run the delegate's `exchange-check` skill/slash-command in its own terminal (no
-argument needed: it finds its own pending file via the same `exchange_status.py --turn delegate
---paths-only`).
-
-**The delegate reads `request`, does the round's work, and writes `response`** matching one of:
-
-- Plan round: `{"type": "plan", "approach": str, "files_seams": [str], "risks": str, "test_strategy": str}`
-- Implementation round: `{"type": "report", "status": "DONE"|"BLOCKED"|"PARTIAL", "summary": str, "files_changed": [str], "blocked_reason": str|null}`
-
-then sets `turn: "claude"`. It never touches the ticket `.md` or commits anything — only Claude does
-either, once it reads a terminal `response`.
-
-**On the Monitor's notification**, Claude reads `response`:
-
-- Missing, or fails to parse against its schema → treat it as a crash, never assume success. Flip
-  the ticket to `status: blocked` and escalate to the real user with whatever's available — don't
-  try to repair or continue from the exchange file's now-unreliable state yourself; the real user
-  decides whether to fix the file and retry, or supersede the ticket (see below).
-- Plan reply → the same 4-bucket review as 6.3, and the same rule for what counts toward the
-  `plan_round` budget of 3:
-  - **Ungrounded**, or a **Factual/Approach** disagreement once the budget is already spent →
-    escalate now instead of another round: append the closed round to `history`, `outcome:
-    "escalated"`, `turn: "none"`, flip the ticket to `status: blocked`, and bring both positions to
-    the real user.
-  - **Factual inconsistency** or **Approach/quality** (budget not yet spent) → append the closed
-    round to `history`, bump `plan_round` (both here and on the ticket — this is the only bucket
-    that counts toward the budget), write a new `request` (the correction), `turn: "delegate"` — a
-    fresh Monitor cycle.
-  - **Incomplete** → append the closed round to `history`, write a new `request` asking for the
-    missing part, `turn: "delegate"` — do **not** bump `plan_round`; 6.3 explicitly excludes this
-    bucket from the budget.
-  - **Acceptable** → `stage: "implementation"`, write `approved_plan` (the plan text itself, spelled
-    out — the delegate's own session may have compacted it away by now), a new `request` (the
-    implementation brief), `turn: "delegate"`.
-- Implementation reply `DONE` → append to `history`, `outcome: "done"`, `turn: "none"`; flip the
-  ticket's `status: done` and commit — Claude's job now, never the delegate's. Continue immediately
-  to whatever tickets this one was blocking (see the note at the end of this step) — no need to wait
-  for the real user to say so.
-- `BLOCKED` → append to `history`, `outcome: "blocked"`, `turn: "none"`; flip the ticket to `status:
-  blocked`, escalate to the real user.
-- `PARTIAL` → treat like a correction round: append to `history`, a new `request`, `turn: "delegate"`.
-
-**Reassigning a ticket away from the delegate mid-flight** (the real user decides to implement it
-themselves, or hand it to someone else, before a terminal outcome): append the current round to
-`history`, set `outcome: "superseded"`, `turn: "none"` — *before* changing `assigned_to`. A dangling
-`turn: "delegate"` on an abandoned ticket is exactly what the pre-dispatch check above exists to catch.
-
-**Duplicate active ticket** (`exchange_status.py --turn delegate` or `--turn claude` ever returns more
-than one file): this should be structurally impossible under the sequential, one-ticket-at-a-time
-model this protocol assumes — treat it as a bug, not a race to resolve by picking one. Whichever
-side notices first stops and reports it to the real user without acting on either file; only the
-real user (or Claude, once told) decides which one is stale and corrects it.
-
-The `NN-slug.exchange.json` file travels with the ticket when a completed feature is archived to
-`.claude/tasks/_archive/` — it's part of the ticket's record, not scratch space to clean up on its
-own.
-
-</exchange-protocol>
+  `assigned_to` and `status: in-progress`, write the exchange file (`ticket_path`, `stage` from 6.3,
+  `skeleton_paths`, `test_paths`, `request` from 6.3, `turn: "delegate"`), then invoke
+  `watch-delegate` — it owns arming the Monitor and everything after. **The real user runs the
+  delegate CLI themselves, in their own terminal — never spawn it as a subprocess.** Most such CLIs'
+  own tool-permission model auto-denies anything they need (network reads, writes outside a narrow
+  default, etc.) unless launched with a flag that skips all of their permission prompts; Claude
+  Code's own auto-mode classifier denies Claude spawning a process with that flag itself ("Create
+  Unsafe Agents"). There is no way around this from inside Claude Code — don't try another tool,
+  another quoting trick, or another invocation shape to get the same outcome; ask the real user to
+  run it instead.
 
 Mention the routing suggestion for that complexity tier as a hint, not an instruction. If
 `.claude/routing.json` has a block for that delegate, its value may still be blank — say so if it
@@ -394,7 +281,8 @@ one), say that too ("no routing suggestion configured for `<cli>`") instead of s
 nothing — the real user picks the model themselves either way, but they should know it's missing,
 not assume there was never one to give.
 
-Once a ticket completes (a Claude subagent returns, or the exchange protocol reaches `outcome:
-"done"`), the ticket(s) it was blocking may join the frontier — repeat this step for them,
-immediately and without waiting to be told, regardless of which delegate handled the ticket that
-just finished.
+Once `watch-delegate` reports a terminal outcome for this ticket (`done`, or `blocked`/escalated),
+the ticket(s) it was blocking may join the frontier if it finished `done` — repeat this step for
+them, immediately and without waiting to be told, regardless of which delegate handled the ticket
+that just finished. If it finished `blocked`/escalated and the real user later re-cuts it via a fresh
+`/to-tickets` run, that re-cut naturally reaches this same step 6 again once it's ready to dispatch.

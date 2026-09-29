@@ -17,7 +17,7 @@ hand pieces to different coding agents." That's what this repo solves:
   trivial ──────────────────────────────────────────────────► implement → test
   bug     ── debugging ────────────────────────────────────► fix → test → ticket-review
   small   ── to-spec ───────────────────────────────────────► implementation → test → ticket-review
-  large   ── grilling → to-spec → to-tickets → delegate ────► implementation → test → ticket-review → update memory
+  large   ── grilling → to-spec → to-tickets → watch-delegate ► implementation → test → ticket-review → update memory
 ```
 
 `to-tickets` cuts a spec into tickets with `depends_on` edges, and only tickets whose blockers
@@ -28,11 +28,15 @@ to-tickets writes:   01 (no blockers)   02 (blocked by 01)   03 (blocked by 01)
                             │
                             ▼
        01: trivial? implement it directly, no dispatch at all
-       01: otherwise, write its skeleton + tests, then delegate to:
+       01: otherwise, write its skeleton + tests, then hand off to watch-delegate, which dispatches to:
                  Claude subagent | an external CLI you run yourself (Codex, Antigravity, ...)
                             │
-        medium/large: plan → Main Agent reviews (approve / correct / escalate) → implement
+        medium/large: plan → watch-delegate reviews (approve / correct / escalate) → implement
         trivial/small: implement straight away
+                            │
+        watch-delegate verifies a DONE reply (reruns tests, checks test legitimacy
+        and scope adherence) before accepting it, self-correcting a BLOCKED ticket
+        against SPEC.md when it can, escalating to you when it can't
                             │
                        01 → done
                             │
@@ -93,8 +97,15 @@ alone. `AGENTS.md` is never overwritten, only staged as `.template`.
   `.claude/tasks/<feature-slug>/NN-slug.md`, each with a `depends_on` list and a `complexity`
   rating. `trivial` tickets are implemented directly, never dispatched; adjacent `trivial`/`small`
   tickets in the same dependency chain get merged. For every other ticket in the frontier, it writes
-  the seam-level skeleton and tests first, gets a plan approved for `medium`/`large` tickets, then
-  delegates the implementation.
+  the seam-level skeleton and tests first, writes the first dispatch request, then hands off to
+  `watch-delegate`.
+- **`watch-delegate`** — supervises one dispatched ticket end to end: negotiates plan rounds against
+  `SPEC.md`/`decisions.md`/`patterns.md`, verifies a DONE reply independently before accepting it
+  (reruns tests, checks that any delegate-authored test is legitimate and actually exercises what it
+  claims, checks the diff stayed inside an approved plan's scope), and triages a BLOCKED report:
+  self-corrects the ticket when the answer already exists in project knowledge, otherwise escalates
+  to you (with the fix routed back through `/grill-me` → `/to-spec` → `/to-tickets` if it turns out to
+  be a spec-level decision, not just this ticket's wording).
 - **`implementation`** — what a coding agent does with one ticket: read it, fill in the given
   skeleton using `tdd` at its pre-written seams, never edit a test, stay inside an approved plan's
   scope, report DONE / BLOCKED / PARTIAL.
@@ -138,7 +149,7 @@ external CLI gets exactly one JSON file (`.claude/tasks/<feature>/NN-slug.exchan
 mutated in place across every round rather than resumed as a conversation — the Main Agent watches
 it automatically (a background file-watch, no polling) and reacts the moment you flip its `turn`
 field, but starting the delegate on a new round is still on you: run its `exchange-check`
-skill/slash-command in its own terminal, no argument needed. See `to-tickets`'s `<exchange-protocol>`
+skill/slash-command in its own terminal, no argument needed. See `watch-delegate`'s `<exchange-protocol>`
 for the exact schema and turn-taking rules, and `scripts/exchange_status.py` for finding whichever
 ticket is currently waiting on which side.
 
@@ -158,7 +169,8 @@ AGENTS.md                               # pointer for non-Claude coding agents (
 .claude/rules/workflow.md               # always loaded: which skill for which kind of task
 .claude/skills/grilling/                # resolve ambiguity before spending a spec on it
 .claude/skills/to-spec/                 # conversation → .claude/tasks/<feature>/SPEC.md
-.claude/skills/to-tickets/               # spec → tickets, then delegate each unblocked one
+.claude/skills/to-tickets/               # spec → tickets, then hand off the first dispatch
+.claude/skills/watch-delegate/          # supervises one dispatched ticket end to end
 .claude/skills/implementation/          # what a coding agent does with one ticket
 .claude/skills/tdd/                     # red-green-refactor loop
 .claude/skills/debugging/               # disciplined bug-diagnosis loop

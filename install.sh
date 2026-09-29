@@ -10,8 +10,9 @@
 #
 # Spec-first planning for large features, and tickets you can delegate to Claude or any
 # external coding CLI you run yourself (Codex, Antigravity, ...): grilling / to-spec /
-# to-tickets / implementation / tdd / debugging / ticket-review, plus AGENTS.md,
-# scripts/tasks_status.py, scripts/exchange_status.py, and .agents/skills/exchange-check/SKILL.md.
+# to-tickets / watch-delegate / implementation / tdd / debugging / ticket-review, plus
+# AGENTS.md, scripts/tasks_status.py, scripts/exchange_status.py, and
+# .agents/skills/exchange-check/SKILL.md.
 #
 # This tier assumes the memory bank is already installed in the target (decisions.md,
 # patterns.md, troubleshooting.md — the workflow skills read and cite them). See
@@ -61,6 +62,7 @@ FILES=(
   ".claude/skills/grilling/SKILL.md"
   ".claude/skills/to-spec/SKILL.md"
   ".claude/skills/to-tickets/SKILL.md"
+  ".claude/skills/watch-delegate/SKILL.md"
   ".claude/skills/implementation/SKILL.md"
   ".claude/skills/tdd/SKILL.md"
   ".claude/skills/debugging/SKILL.md"
@@ -79,6 +81,7 @@ TEMPLATE_OWNED=(
   ".claude/skills/grilling/SKILL.md"
   ".claude/skills/to-spec/SKILL.md"
   ".claude/skills/to-tickets/SKILL.md"
+  ".claude/skills/watch-delegate/SKILL.md"
   ".claude/skills/implementation/SKILL.md"
   ".claude/skills/tdd/SKILL.md"
   ".claude/skills/debugging/SKILL.md"
